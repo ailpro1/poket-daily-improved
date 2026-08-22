@@ -780,6 +780,17 @@ body.no-scroll { overflow: hidden; }
 .toast-count { font-family: var(--mono); opacity: .7; }
 .toast-warn { background: var(--red); color: #fff; }
 
+/* A persistent sibling of the toast, positioned on its own so that toast()
+   can keep wiping #toast-host without taking the update notice with it.
+   Above the splash (60): a first-open update lands while it still holds. */
+.update-bar {
+  position: fixed;
+  left: 12px; right: 12px;
+  margin: 0 auto;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  z-index: 70;
+}
+
 /* ---------- splash --------------------------------------------------------------------------- */
 
 #splash {

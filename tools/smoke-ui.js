@@ -176,6 +176,29 @@ w.addEventListener('error', e => errors.push(e.message));
     w.Onboarding.midCyclePending() === false);
   await w.Actions.saveSettings({ midCycleAsked: true, midCycleJoinDate: null });
 
+  // the "app is updating" bar. Service workers do not exist in jsdom, so this
+  // covers the part that does: the bar itself, and the promise that a reload
+  // never lands on top of a half-filled form.
+  w.UI.updateBar('App is updating. Please wait…');
+  check('update bar shows a message along the bottom',
+    !!$('.update-bar') && /App is updating/.test($('.update-bar').textContent));
+  check('update bar outlives a toast', (w.UI.toast('Something else'), !!$('.update-bar')));
+  const escape = () => D.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape' }));
+  while (w.UI.busy()) { escape(); await wait(300); }
+  check('nothing is open, so a reload would go straight through', w.UI.busy() === false);
+  w.Forms.transaction(); await wait();
+  check('a form sheet counts as busy', w.UI.busy() === true);
+  let reloaded = false;
+  w.UI.onIdle(() => { reloaded = true; });
+  check('a reload waits while the form is open', reloaded === false);
+  w.UI.updateBar('Update ready. It will load when you finish here.', { actionLabel: 'Reload now' });
+  check('update bar offers a way to take it now', !!$('.update-bar .toast-action'),
+    $('.update-bar .toast-action').textContent);
+  escape(); await wait(300);
+  check('and goes ahead once the form closes', reloaded === true);
+  w.UI.updateBar(false); await wait(300);
+  check('update bar can be dismissed', !$('.update-bar'));
+
   // delete with undo
   const id = w.S.logs.filter(l => !l.transferPairId)[0].id;
   await w.Actions.deleteLog(id); await wait();

@@ -110,6 +110,27 @@ Adding a JS or CSS file means adding it to **both** `index.html` and the
 `ASSETS` array in `sw.js`, or offline mode silently breaks.
 `node tools/check-cache.js` catches that.
 
+## Shipping an update
+
+**Bump `CACHE` in `sw.js` on every release.** Non-navigation requests are served
+cache first, so until that name changes a returning user keeps being handed the old
+`js/` and `css/` out of the old cache — new code simply never reaches them. Nothing
+can check this for you: `check-cache.js` verifies the asset *list*, not the version.
+
+The bump is also the signal the app watches for. A changed `sw.js` installs as a new
+worker, `skipWaiting()` and `clients.claim()` put it in charge, and
+`App.watchForUpdate()` in `js/app.js` shows **"App is updating. Please wait…"** along
+the bottom and reloads the page once, so the running tab stops serving the build it
+parsed at boot. Three rules it holds to:
+
+- **Silent on a first install.** With no existing controller the page already loaded
+  these exact files from the network, so there is nothing to announce.
+- **The notice is readable.** It is held for `UPDATE_NOTICE_MS` before the reload —
+  on a fast connection the install finishes in milliseconds, and without the dwell
+  the app looks like it reloaded for no reason.
+- **It never reloads under a form.** If a sheet is open the bar offers *Reload now*
+  and otherwise waits for `UI.onIdle()`, so half-entered data is never thrown away.
+
 ## Tests
 
 Development-only; nothing in `tools/` ships or is referenced by the app.
