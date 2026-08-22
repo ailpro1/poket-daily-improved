@@ -114,8 +114,29 @@ Adding a JS or CSS file means adding it to **both** `index.html` and the
 
 **Bump `CACHE` in `sw.js` on every release.** Non-navigation requests are served
 cache first, so until that name changes a returning user keeps being handed the old
-`js/` and `css/` out of the old cache — new code simply never reaches them. Nothing
-can check this for you: `check-cache.js` verifies the asset *list*, not the version.
+`js/` and `css/` out of the old cache — new code simply never reaches them.
+`check-cache.js` verifies the asset *list*; the *version* is `tools/release.js`:
+
+```bash
+node tools/release.js           # bump CACHE, listing what the bump covers
+node tools/release.js --check   # exit 1 if a shipped asset changed since the last bump
+```
+
+It answers the question by asking git: find the commit that introduced the current
+`CACHE` string, then diff every shipped asset from there to the working tree. So
+uncommitted edits count, which is what makes it useful before a push:
+
+```bash
+# .git/hooks/pre-push   (chmod +x)
+#!/bin/sh
+exec node tools/release.js --check
+```
+
+Both directions refuse to do something pointless: `--check` passes on a bump you
+have not committed yet, and a plain bump stops if no asset has moved, since a
+gratuitous new cache name makes every user re-download the whole app. `--force`
+overrides either. When git cannot answer — no repo, a shallow clone without the
+bump commit — it says so and passes rather than blocking a release on a guess.
 
 The bump is also the signal the app watches for. A changed `sw.js` installs as a new
 worker, `skipWaiting()` and `clients.claim()` put it in charge, and
@@ -139,6 +160,7 @@ Development-only; nothing in `tools/` ships or is referenced by the app.
 node tools/selfcheck.js     # the spec's 7-step scenario against calc.js directly
 node tools/selfcheck-midcycle.js  # the mid-cycle-start rule, in isolation
 node tools/check-cache.js   # every asset is in the service worker precache
+node tools/release.js --check      # sw.js CACHE was bumped for the assets that changed
 node tools/smoke.js         # boots the app in jsdom, reads numbers back off the DOM
 node tools/smoke-ui.js      # opens every sheet, submits every form
 node tools/smoke-splash.js  # greeting by hour, budget figure, once-per-day rule
