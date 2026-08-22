@@ -87,6 +87,72 @@
     reader.readAsText(file);
   }
 
+  /* ---------- this cycle (joining part-way through) ----------------------
+     Only rendered when the join date actually falls mid-cycle — the controls
+     are meaningless otherwise, and Calc.midCycle() ignores them anyway. */
+  function midCycleSection(body) {
+    var st = root.S.settings;
+    var join = st.midCycleJoinDate || st.budgetStartDate || C.iso(C.today());
+    if (!C.isMidCycle(join)) return null;
+
+    var mode = (st.midCycleMode || 'prorate') === 'remaining' ? 'remaining' : 'prorate';
+
+    body.appendChild(el('div', { class: 'kv-split' }));
+    body.appendChild(el('span', { class: 'eyebrow', text: 'This cycle' }));
+
+    var joinInput = el('input', { class: 'input', type: 'date', value: join });
+    body.appendChild(UI.field('Budgeting started on', joinInput,
+      'The day you began using Poket Daily. Everything before it is left out of the carry-over.'));
+
+    var amountWrap = el('div', {});
+    var amount = el('input', { class: 'input input-amount' });
+    root.CentInput.bind(amount, st.midCycleRemaining || '');
+    amountWrap.appendChild(UI.field('Spending money you had left that day', amount));
+    var rate = el('p', { class: 'sheet-note' });
+    amountWrap.appendChild(rate);
+    amountWrap.appendChild(el('button', {
+      class: 'btn btn-ghost btn-block btn-sm', text: 'Suggest a figure',
+      onclick: function () {
+        root.CentInput.set(amount, Math.max(0, Calc.suggestMidCycleRemaining(joinInput.value)));
+      }
+    }));
+
+    function paintRate() {
+      var days = C.daysToCycleEnd(joinInput.value || join);
+      var endLabel = C.dateLabel(C.getCycleRangeForKey(C.getMonthKey(joinInput.value || join)).endIso);
+      rate.textContent = C.isMidCycle(joinInput.value || join)
+        ? root.Fmt.money(root.CentInput.value(amount) / days) + ' a day across ' + days +
+          ' day' + (days === 1 ? '' : 's') + ' to ' + endLabel + '.'
+        : 'That date is the first day of a cycle, so the normal monthly rate applies.';
+    }
+    amount.addEventListener('input', paintRate);
+    joinInput.addEventListener('change', paintRate);
+
+    function applyMode() {
+      amountWrap.classList.toggle('hidden', mode !== 'remaining');
+      if (mode === 'remaining') paintRate();
+    }
+
+    body.appendChild(UI.segmented([
+      { value: 'remaining', label: 'Spread what I had left' },
+      { value: 'prorate', label: 'Normal monthly rate' }
+    ], mode, function (v) { mode = v; applyMode(); }));
+    body.appendChild(el('p', { class: 'sheet-note', text: 'Spreading uses the figure you had left instead of the Plan pool, and only for the cycle you joined in. Later cycles always use the Plan.' }));
+    body.appendChild(amountWrap);
+    applyMode();
+
+    return {
+      patch: function () {
+        return {
+          midCycleMode: mode,
+          midCycleJoinDate: joinInput.value || join,
+          midCycleRemaining: root.CentInput.value(amount),
+          midCycleAsked: true
+        };
+      }
+    };
+  }
+
   function open() {
     var saved = false;
     var styleWas = root.S.settings.cardStyle || 'flat';
@@ -101,6 +167,8 @@
 
         var startDay = el('input', { class: 'input', type: 'number', min: '1', max: '28', value: root.S.settings.cycleStartDay });
         body.appendChild(UI.field('Cycle starts on day', startDay, 'Set 25 if your month runs the 25th to the 24th.'));
+
+        var mid = midCycleSection(body);
 
         var theme = UI.select(
           [{ value: 'system', label: 'Match my phone' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
@@ -119,16 +187,25 @@
           el('button', {
             class: 'btn btn-primary', text: 'Save settings',
             onclick: function () {
-              root.Actions.saveSettings({
+              var day = Math.min(28, Math.max(1, parseInt(startDay.value, 10) || 1));
+              var dayMoved = day !== root.S.settings.cycleStartDay;
+              var patch = {
                 currency: cur.value.trim() || 'RM',
-                cycleStartDay: Math.min(28, Math.max(1, parseInt(startDay.value, 10) || 1)),
+                cycleStartDay: day,
                 theme: theme.value,
                 cardStyle: cardStyle.value
-              }).then(function () {
+              };
+              if (mid) Object.assign(patch, mid.patch());
+              root.Actions.saveSettings(patch).then(function () {
                 saved = true;
                 root.App.applyTheme();
                 s.close();
-                UI.toast('Settings saved');
+                /* Moving the cycle start moves the cycle END, so a spread
+                   figure re-spreads over a different number of days. That is
+                   unavoidable, but it must not be silent. */
+                UI.toast(dayMoved && patch.midCycleMode === 'remaining'
+                  ? 'Saved — your first cycle re-spread to the new cycle end'
+                  : 'Settings saved');
               });
             }
           })

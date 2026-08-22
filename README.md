@@ -41,6 +41,27 @@ money and still move account balances, and they still appear in the Log tab's
 "out this cycle" total. `Calc.affectsBudget()` is the single predicate for this;
 everything that needs the rule calls it.
 
+### Starting part-way through a cycle
+
+Install on day 20 of a 31-day cycle and neither half of the usual sum holds: there
+is not a full cycle's pool left, and there are not a full cycle's days to spend it
+over. So onboarding asks — after the cycle start day and the accounts, before the
+Plan — how much spending money is actually left until the cycle ends. `Calc.midCycle()`
+turns that answer into the rule for **that one cycle**: the stated figure divided by
+the days from the join date to the cycle end. Every later cycle goes back to the Plan
+pool over its own days.
+
+`carryInto()` is floored at the join date, because pre-join spending is already
+deducted inside the figure the user typed — charging it again from the logs would
+double-count it. That money is still real: it moves account balances and shows in the
+Log tab and the Breakdown, it just does not drain a budget that did not exist yet.
+
+Nothing derived is stored — only the join **date**, in `settings.midCycleJoinDate`.
+The cycle key and the day count are recomputed from it, so changing the cycle start
+day re-derives them, and a join that lands on day 1 disables the rule by itself. All
+of it is editable later under Settings → **This cycle**, and an install that was
+already mid-cycle when it first booted is asked the question once.
+
 ### Carry-over
 
 `Calc.carryInto(date)` walks every day from the day budgeting actually began up
@@ -80,7 +101,7 @@ js/charts.js            hand-rolled SVG line, doughnut and day-strip charts
 js/forms.js             transaction, transfer, account and plan-item sheets
 js/checklist.js         per-cycle checklist drawer
 js/tab-*.js             Home, Log, Plan, Accounts, Breakdown
-js/onboarding.js        first-run guide (accounts before plan)
+js/onboarding.js        first-run guide (cycle, accounts, mid-cycle, plan)
 js/settings.js          preferences, JSON backup/restore, plan CSV
 js/app.js               state load, routing, header, nav, theme, SW registration
 ```
@@ -95,15 +116,23 @@ Development-only; nothing in `tools/` ships or is referenced by the app.
 
 ```bash
 node tools/selfcheck.js     # the spec's 7-step scenario against calc.js directly
+node tools/selfcheck-midcycle.js  # the mid-cycle-start rule, in isolation
 node tools/check-cache.js   # every asset is in the service worker precache
 node tools/smoke.js         # boots the app in jsdom, reads numbers back off the DOM
 node tools/smoke-ui.js      # opens every sheet, submits every form
 node tools/smoke-splash.js  # greeting by hour, budget figure, once-per-day rule
 ```
 
+`selfcheck.js` deliberately pins the *unmodified* full-cycle baseline, which is what
+proves the mid-cycle default is inert; the mid-cycle cases live in their own file.
+
 The last two need jsdom and fake-indexeddb (`npm i jsdom fake-indexeddb`) and
 expect them in a `node_modules` alongside the project; adjust the require paths
 at the top of each file if yours sit elsewhere.
+
+`smoke-ui.js` drives the setup guide end to end, including the cycle step and the
+mid-cycle question, and it forces a cycle start day that guarantees today is past it
+so the mid-cycle step is reached whatever date the harness runs on.
 
 `smoke.js` asserts the full self-check scenario through the rendered UI: account
 cards summing to the Home balance cards, Log-tab totals, breakdown footing to

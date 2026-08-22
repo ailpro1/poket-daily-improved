@@ -1,17 +1,152 @@
-/* onboarding.js — accounts first, plan second. Getting starting balances right
-   is the whole point (spec 11). */
+/* onboarding.js — cycle first, accounts second, plan third. Getting the cycle
+   and the starting balances right is the whole point (spec 11).
+
+   Step 4 is the mid-cycle question: someone installing on day 20 has neither a
+   full cycle's pool left nor a full cycle's days to spend it over, so we ask
+   what is actually left and let Calc.midCycle() spread that instead. It is
+   skipped entirely when today IS the first day of the cycle. */
 (function (root) {
   'use strict';
 
-  var UI = root.UI, el = UI.el, Calc = root.Calc, Fmt = root.Fmt;
+  var UI = root.UI, el = UI.el, Calc = root.Calc, Fmt = root.Fmt, C = root.Cycles;
+
+  /* The join date budgeting actually began on, for the question's maths. */
+  function joinDate() {
+    var st = (root.S && root.S.settings) || {};
+    return st.midCycleJoinDate || st.budgetStartDate || C.iso(C.today());
+  }
+
+  /* Step 4 is only meaningful while the user is still IN the cycle they joined.
+     Someone re-running the guide months later is not joining mid-cycle any
+     more, and re-flooring carryInto() at today would silently discard the
+     carry-over they have built up since. */
+  function midCycleApplies() {
+    var join = joinDate();
+    return C.isMidCycle(C.iso(C.today())) &&
+      C.isMidCycle(join) &&
+      C.getMonthKey(join) === C.currentCycleKey();
+  }
+
+  /* Step 4 drops out of the flow — and out of the dots — when it does not apply. */
+  function visibleSteps() {
+    return midCycleApplies() ? [0, 1, 2, 3, 4, 5] : [0, 1, 2, 3, 5];
+  }
 
   function progressDots(step) {
+    var vis = visibleSteps(), at = vis.indexOf(step);
     var wrap = el('div', { class: 'dots' });
-    [0, 1, 2, 3].forEach(function (i) {
-      wrap.appendChild(el('span', { class: 'dot' + (i === step ? ' on' : (i < step ? ' done' : '')) }));
+    vis.forEach(function (s, i) {
+      wrap.appendChild(el('span', { class: 'dot' + (i === at ? ' on' : (i < at ? ' done' : '')) }));
     });
     return wrap;
   }
+
+  function existingList(accs) {
+    if (!accs.length) return el('p', { class: 'card-note', text: 'None added yet.' });
+    var ul = el('ul', { class: 'mini-list' });
+    accs.forEach(function (a) {
+      ul.appendChild(el('li', {}, [
+        el('span', { text: a.icon + ' ' + a.name }),
+        el('b', { class: 'num', text: Fmt.money(Calc.accountBalance(a.id)) })
+      ]));
+    });
+    return ul;
+  }
+
+  function summaryRow(label, value) {
+    return el('div', { class: 'ob-sum-row' }, [
+      el('span', { class: 'eyebrow', text: label }),
+      el('b', { class: 'num', text: Fmt.money(value) })
+    ]);
+  }
+
+  /* ---------- the mid-cycle question ------------------------------------- */
+
+  /* Appends the whole question to `body`. Used by onboarding step 4 and by the
+     standalone sheet that Settings and the once-only boot prompt open, so the
+     wording and the maths can never drift apart. opts.onDone(saved) fires
+     after whichever button was pressed has persisted. */
+  function midCycleQuestion(body, opts) {
+    opts = opts || {};
+    var joinIso = opts.joinIso || C.iso(C.today());
+    var range = C.getCycleRangeForKey(C.getMonthKey(joinIso));
+    var days = C.daysToCycleEnd(joinIso);
+    var endLabel = C.dateLabel(range.endIso);
+
+    body.appendChild(el('h3', { class: 'ob-title', text: 'You are starting part-way through' }));
+    body.appendChild(el('p', { class: 'ob-copy', text: 'This cycle runs to ' + endLabel + '. That is ' + days + ' day' + (days === 1 ? '' : 's') + ' left, counting today.' }));
+    body.appendChild(el('p', { class: 'ob-copy', text: 'Your Plan describes a whole cycle, and most of this one has already happened. So for this first cycle we go off what you actually have, not what the Plan says arrives.' }));
+
+    var suggested = Math.max(0, Calc.suggestMidCycleRemaining(joinIso));
+    var amount = el('input', { class: 'input input-amount' });
+    root.CentInput.bind(amount, suggested || '');
+    body.appendChild(UI.field('Spending money left until ' + endLabel, amount));
+
+    body.appendChild(el('p', { class: 'ob-copy', text: 'We guessed ' + Fmt.money(suggested) + ' from your spending accounts. That treats every cent in them as yours to spend — take out any rent, bills or instalments you still have to pay before ' + endLabel + '.' }));
+
+    var rate = el('p', { class: 'ob-copy strong' });
+    function paintRate() {
+      var v = root.CentInput.value(amount);
+      rate.textContent = 'That is ' + Fmt.money(v / days) + ' a day until ' + endLabel + '.';
+    }
+    amount.addEventListener('input', paintRate);
+    paintRate();
+    body.appendChild(rate);
+
+    function done(patch) {
+      root.Actions.saveSettings(patch).then(function () {
+        if (opts.onDone) opts.onDone(patch.midCycleMode === 'remaining');
+      });
+    }
+
+    body.appendChild(el('button', {
+      class: 'btn btn-primary btn-block', text: 'Use this for the rest of the cycle',
+      onclick: function () {
+        done({
+          midCycleMode: 'remaining',
+          midCycleJoinDate: joinIso,
+          midCycleRemaining: root.CentInput.value(amount),
+          midCycleAsked: true
+        });
+      }
+    }));
+    body.appendChild(el('button', {
+      class: 'btn btn-ghost btn-block', text: 'I have already spent my share — use the normal rate',
+      onclick: function () { done({ midCycleMode: 'prorate', midCycleAsked: true }); }
+    }));
+    body.appendChild(el('p', { class: 'sheet-note', text: 'Either way you can change this later in Settings, under This cycle.' }));
+  }
+
+  /* Standalone version for Settings and for the once-only prompt at boot. */
+  function openMidCycleSheet(opts) {
+    opts = opts || {};
+    return UI.sheet({
+      title: 'Your first cycle',
+      render: function (body, api) {
+        midCycleQuestion(body, {
+          joinIso: opts.joinIso,
+          onDone: function (spread) {
+            api.close();
+            UI.toast(spread ? 'Daily budget spread over the rest of this cycle' : 'Using the normal monthly rate');
+          }
+        });
+      }
+    });
+  }
+
+  /* Installed part-way through the cycle they are STILL in, and never asked.
+     Deliberately not fired for an older join date: re-spreading a historical
+     cycle would rewrite carry-over that has already flowed through everything
+     since. Those users can still set it from Settings. */
+  function midCyclePending() {
+    var s = (root.S && root.S.settings) || {};
+    if (!s.onboarded || s.midCycleAsked) return false;
+    if ((s.midCycleMode || 'prorate') !== 'prorate') return false;
+    if (!(s.midCycleJoinDate || s.budgetStartDate)) return false;
+    return midCycleApplies();
+  }
+
+  /* ---------- the guide -------------------------------------------------- */
 
   function open(startStep) {
     var step = startStep || 0;
@@ -29,10 +164,45 @@
         body.appendChild(el('p', { class: 'ob-copy', text: 'Monthly Balance and Savings Balance show what you actually have — they are added up straight from your accounts.' }));
         body.appendChild(el('p', { class: 'ob-copy', text: 'The daily budget on Home is a forecast built from your Plan. Different job, different number.' }));
         body.appendChild(el('p', { class: 'ob-copy strong', text: 'Set up accounts first, Plan second. Skipping account setup is what makes those balances read zero later.' }));
-        next(body, api, 'Start with accounts');
+        next(body, api, 'Next: your money month');
       }
 
       if (step === 1) {
+        body.appendChild(el('h3', { class: 'ob-title', text: 'When does your money month start?' }));
+        body.appendChild(el('p', { class: 'ob-copy', text: 'Payday, not the 1st, for most people. Set 25 if your month runs the 25th to the 24th. Every cycle figure in the app is measured from this day.' }));
+
+        var day = el('input', {
+          class: 'input', type: 'number', min: '1', max: '28',
+          value: root.S.settings.cycleStartDay
+        });
+        var preview = el('p', { class: 'ob-copy strong' });
+        function clamped() { return Math.min(28, Math.max(1, parseInt(day.value, 10) || 1)); }
+        /* Previewing needs cycleStartDay live, so save on the way out, but
+           label from the typed value rather than from settings. */
+        function paintPreview() {
+          var d = clamped();
+          var was = root.S.settings.cycleStartDay;
+          root.S.settings.cycleStartDay = d;
+          preview.textContent = 'This cycle: ' + C.cycleLabel(C.currentCycleKey()) + '.';
+          root.S.settings.cycleStartDay = was;
+        }
+        day.addEventListener('input', paintPreview);
+        paintPreview();
+        body.appendChild(UI.field('Cycle starts on day', day, 'Capped at 28 so every month has one.'));
+        body.appendChild(preview);
+
+        body.appendChild(el('button', {
+          class: 'btn btn-primary btn-block', text: 'Next: accounts',
+          onclick: function () {
+            root.Actions.saveSettings({ cycleStartDay: clamped() }).then(function () {
+              advance(body, api);
+            });
+          }
+        }));
+        skipRow(body, api);
+      }
+
+      if (step === 2) {
         var gens = Calc.accountsOfType('general');
         body.appendChild(el('h3', { class: 'ob-title', text: 'Add your main spending account' }));
         body.appendChild(el('p', { class: 'ob-copy', text: 'Checking account, wallet, e-wallet — whatever you actually pay with day to day.' }));
@@ -48,7 +218,7 @@
         else skipRow(body, api);
       }
 
-      if (step === 2) {
+      if (step === 3) {
         var savs = Calc.accountsOfType('saving');
         body.appendChild(el('h3', { class: 'ob-title', text: 'Keep savings separate?' }));
         body.appendChild(el('p', { class: 'ob-copy', text: 'ASB, fixed deposit, digital bank, tabung — add it here and its balance becomes your Savings Balance straight away. Optional.' }));
@@ -59,10 +229,17 @@
             root.Forms.account(null, { type: 'saving', onSaved: function () { paint(body, api); } });
           }
         }));
-        next(body, api, 'Next: your plan');
+        next(body, api, midCycleApplies() ? 'Next: this cycle' : 'Next: your plan');
       }
 
-      if (step === 3) {
+      if (step === 4) {
+        midCycleQuestion(body, {
+          joinIso: joinDate(),
+          onDone: function () { advance(body, api); }
+        });
+      }
+
+      if (step === 5) {
         body.appendChild(el('h3', { class: 'ob-title', text: 'Now set up your Plan' }));
         body.appendChild(el('p', { class: 'ob-copy', text: 'Income, commitments and savings goals. Each one gets assigned to an account you just created.' }));
         body.appendChild(el('p', { class: 'ob-copy', text: 'This powers the Daily Spending Budget forecast — separate from the account totals you just entered.' }));
@@ -85,12 +262,21 @@
       }
     }
 
+    function advance(body, api) {
+      var vis = visibleSteps();
+      var at = vis.indexOf(step);
+      step = vis[Math.min(at + 1, vis.length - 1)];
+      paint(body, api);
+    }
+
     function next(body, api, label) {
       body.appendChild(el('button', {
         class: 'btn btn-primary btn-block', text: label,
-        onclick: function () { step += 1; paint(body, api); }
+        onclick: function () { advance(body, api); }
       }));
-      if (step < 3) skipRow(body, api);
+      /* intro, cycle, spending and saving are all skippable — the plan
+         hand-off and the mid-cycle question have their own way out. */
+      if (step < 4) skipRow(body, api);
     }
 
     function skipRow(body, api) {
@@ -106,25 +292,8 @@
       }));
     }
 
-    function existingList(accs) {
-      if (!accs.length) return el('p', { class: 'card-note', text: 'None added yet.' });
-      var ul = el('ul', { class: 'mini-list' });
-      accs.forEach(function (a) {
-        ul.appendChild(el('li', {}, [
-          el('span', { text: a.icon + ' ' + a.name }),
-          el('b', { class: 'num', text: Fmt.money(Calc.accountBalance(a.id)) })
-        ]));
-      });
-      return ul;
-    }
-
-    function summaryRow(label, value) {
-      return el('div', { class: 'ob-sum-row' }, [
-        el('span', { class: 'eyebrow', text: label }),
-        el('b', { class: 'num', text: Fmt.money(value) })
-      ]);
-    }
-
+    /* Only step 4 latches midCycleAsked, so someone who skips the guide still
+       gets the question once from the boot prompt. */
     function finish() {
       root.Actions.saveSettings({ onboarded: true });
     }
@@ -132,5 +301,10 @@
     return s;
   }
 
-  root.Onboarding = { open: open };
+  root.Onboarding = {
+    open: open,
+    midCycle: openMidCycleSheet,
+    midCyclePending: midCyclePending,
+    midCycleQuestion: midCycleQuestion
+  };
 })(typeof self !== 'undefined' ? self : globalThis);

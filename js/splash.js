@@ -51,7 +51,9 @@
       function showGreeting() {
         var g = greeting(new Date().getHours());
         var db = root.Calc.dailyBudget();
-        var hasPlan = root.Calc.cyclePool(db.cycleKey) !== 0;
+        /* effectivePool, not cyclePool: a mid-cycle joiner with a stated
+           figure and an empty Plan does have a budget to show. */
+        var hasPlan = db.effectivePool !== 0;
         var amount = splitAmount(db.left);
 
         UI.$('.splash-emoji', node).textContent = g.emoji;

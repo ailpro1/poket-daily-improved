@@ -88,6 +88,17 @@
 
   function currentCycleKey() { return getMonthKey(today()); }
 
+  /* Inclusive day count from a date to the end of its own cycle. */
+  function daysToCycleEnd(dateIso) {
+    var r = getCycleRangeForKey(getMonthKey(dateIso));
+    return daysBetween(dateIso, r.end) + 1;
+  }
+
+  /* Is this date past the first day of its own cycle? */
+  function isMidCycle(dateIso) {
+    return iso(dateIso) > getCycleRangeForKey(getMonthKey(dateIso)).startIso;
+  }
+
   function inCycle(dateIso, cycleKey) { return getMonthKey(dateIso) === String(cycleKey); }
 
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -117,6 +128,8 @@
     shiftCycleKey: shiftCycleKey,
     cycleKeysBetween: cycleKeysBetween,
     currentCycleKey: currentCycleKey,
+    daysToCycleEnd: daysToCycleEnd,
+    isMidCycle: isMidCycle,
     inCycle: inCycle,
     cycleLabel: cycleLabel,
     dateLabel: dateLabel
