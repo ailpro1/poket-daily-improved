@@ -114,9 +114,71 @@
     return R(planTotal('income', cycleKey) - planTotal('commitments', cycleKey) - planTotal('savings', cycleKey));
   }
 
+  /* ---------- joining part-way through a cycle ---------------------------
+     Someone who installs on day 20 has neither a full cycle's pool left nor
+     a full cycle's days to spend it over. When they tell us what is actually
+     left, that figure — not the Plan's pool — is what gets spread, and only
+     over the days from the join date to the cycle end.
+
+     Nothing derived is ever stored: the cycle key and the day count are
+     recomputed from the join DATE, so editing cycleStartDay re-derives them
+     and a past cycle recomputes identically forever.
+
+     Known limitation: attributedOnDay() spreads a 'spread' log to its cycle
+     end, so a spread expense backdated ACROSS the join is partly charged
+     against a stated figure that already included it. Only reachable by
+     deliberately backdating a spread log over the join date; clamping it
+     would put a branch on the hot path for every day of every day-strip. */
+  function midCycle() {
+    if ('mid' in cache) return cache.mid;      /* null is a meaningful value */
+    var s = S().settings || {};
+    var out = null;
+    if ((s.midCycleMode || 'prorate') === 'remaining') {
+      var join = s.midCycleJoinDate || s.budgetStartDate || null;
+      /* A join on day 1 is not mid-cycle at all, so the rule self-disables.
+         That guard is what absorbs a later cycleStartDay edit. */
+      if (join && C.isMidCycle(join)) {
+        out = {
+          joinIso: join,
+          cycleKey: C.getMonthKey(join),
+          days: C.daysToCycleEnd(join),
+          remaining: R(Math.abs(s.midCycleRemaining || 0))
+        };
+      }
+    }
+    cache.mid = out;
+    return out;
+  }
+
   function dailyAllowance(cycleKey) {
+    var m = midCycle();
+    if (m && m.cycleKey === String(cycleKey)) return R(m.remaining / m.days);
     var r = C.getCycleRangeForKey(cycleKey);
     return R(cyclePool(cycleKey) / r.totalDays);
+  }
+
+  /* Plan money for this cycle that has not been ticked off the checklist.
+     Repeats a predicate that also lives in Actions.checklistLogFor, but calc
+     must not depend on actions — the dependency runs the other way. */
+  function planOutstanding(section, cycleKey) {
+    var logs = S().logs;
+    return R(planItems(section).reduce(function (t, it) {
+      var amt = planAmount(it, cycleKey);
+      if (!amt) return t;
+      for (var i = 0; i < logs.length; i++) {
+        if (logs[i].sourceChecklistId === it.id && logs[i].sourceCycle === cycleKey) return t;
+      }
+      return t + amt;
+    }, 0));
+  }
+
+  /* Best guess at "spending money I have left" for the mid-cycle question.
+     With an empty Plan this is just the general-account balances, which is
+     exactly the cash on hand; it self-improves as Plan items appear. */
+  function suggestMidCycleRemaining(joinIso) {
+    var at = joinIso || C.iso(C.today()), key = C.getMonthKey(at);
+    return R(monthlyBalance(at) + planOutstanding('income', key)
+      - planOutstanding('commitments', key) - planOutstanding('savings', key));
   }
 
   /* ---------- spread vs one-time (spec 3.2) ------------------------------ */
@@ -198,6 +260,12 @@
     var k = 'carry:' + iso;
     if (cache[k] != null) return cache[k];
     var start = firstActivityIso();
+    /* Pre-join spending is already deducted inside the figure the user typed,
+       so re-charging it from the logs would double-count it. The floor is a
+       max(), so a backdated log can no longer pull the walk behind the day
+       budgeting began, and it only ever shortens the walk. */
+    var m = midCycle();
+    if (m && m.joinIso > start) start = m.joinIso;
     if (start >= iso) { cache[k] = 0; return 0; }
     var days = C.daysBetween(start, iso);
     if (days > 1500) { start = C.iso(C.addDays(iso, -1500)); days = 1500; }
@@ -218,6 +286,8 @@
     var carry = carryInto(day);
     var spentToday = budgetDrainOnDay(day);
     var budget = R(allowance + carry);
+    var m = midCycle();
+    var mid = (m && m.cycleKey === cycleKey) ? m : null;
     return {
       date: day,
       cycleKey: cycleKey,
@@ -228,7 +298,12 @@
       left: R(budget - spentToday),
       daysLeft: Math.max(0, C.daysBetween(day, range.end) + 1),
       totalDays: range.totalDays,
-      pool: cyclePool(cycleKey)
+      pool: cyclePool(cycleKey),
+      /* null on every ordinary cycle — the single test the UI needs */
+      midCycleJoinIso: mid ? mid.joinIso : null,
+      midCycleDays: mid ? mid.days : null,
+      effectivePool: mid ? mid.remaining : cyclePool(cycleKey),
+      poolBasis: mid ? 'stated' : 'plan'
     };
   }
 
@@ -364,6 +439,9 @@
     budgetDrainOnDay: budgetDrainOnDay,
     budgetDrainInRange: budgetDrainInRange,
     firstActivityIso: firstActivityIso,
+    midCycle: midCycle,
+    planOutstanding: planOutstanding,
+    suggestMidCycleRemaining: suggestMidCycleRemaining,
     carryInto: carryInto,
     dailyBudget: dailyBudget,
     cycleSummary: cycleSummary,

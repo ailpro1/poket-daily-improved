@@ -99,25 +99,31 @@
   }
 
   /* The signature: one tick per day of the cycle.
-     bars: [{iso, spend, allowance, state:'past'|'today'|'future'}] */
+     bars: [{iso, spend, allowance, state:'past'|'today'|'future'|'pre'}]
+     'pre' is a day before budgeting began — it carries no allowance, so it is
+     drawn like a future day rather than judged against a rate it never had. */
   function dayStrip(bars, opts) {
     opts = opts || {};
     var W = opts.width || 320, H = 44, gap = 1.5;
     var n = bars.length || 1;
     var bw = Math.max(1.5, (W - gap * (n - 1)) / n);
     var peak = Math.max.apply(null, bars.map(function (b) { return b.spend; }).concat([1]));
-    var scale = Math.max(peak, (bars[0] ? bars[0].allowance : 1) * 1.4);
+    /* Scale and reference line come from the first bar that HAS an allowance,
+       not bars[0], which is zero for a cycle joined part-way through. */
+    var ref = bars.filter(function (b) { return b.allowance > 0; })[0] || bars[0] || { allowance: 1 };
+    var scale = Math.max(peak, ref.allowance * 1.4);
     var out = '';
     bars.forEach(function (b, i) {
       var x = i * (bw + gap);
       var h = Math.max(1.5, Math.min(1, b.spend / scale) * (H - 10));
-      var cls = b.state === 'future' ? 'ds-future' : (b.spend > b.allowance ? 'ds-over' : 'ds-under');
+      var cls = (b.state === 'future' || b.state === 'pre') ? 'ds-future'
+        : (b.spend > b.allowance ? 'ds-over' : 'ds-under');
       if (b.state === 'today') cls += ' ds-today';
       out += '<rect class="' + cls + '" x="' + x.toFixed(2) + '" y="' + (H - h).toFixed(2) + '" width="' + bw.toFixed(2) +
         '" height="' + h.toFixed(2) + '" rx="' + Math.min(1.5, bw / 2).toFixed(2) + '"><title>' +
         esc(b.label + ': ' + b.spendLabel) + '</title></rect>';
     });
-    var line = (bars[0] ? (H - Math.min(1, bars[0].allowance / scale) * (H - 10)) : H).toFixed(2);
+    var line = (H - Math.min(1, ref.allowance / scale) * (H - 10)).toFixed(2);
     return '<svg class="daystrip" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="Daily spending across this cycle">' +
       '<line class="ds-line" x1="0" y1="' + line + '" x2="' + W + '" y2="' + line + '"/>' + out + '</svg>';
   }

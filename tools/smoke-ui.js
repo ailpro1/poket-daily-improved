@@ -37,7 +37,8 @@ w.addEventListener('error', e => errors.push(e.message));
 
 (async () => {
   await w.App.boot();
-  await wait(700);
+  /* Splash.ART_HOLD holds the artwork for 3s before the greeting paints. */
+  await wait(3400);
 
   // daily splash comes first
   check('splash shows a greeting for the time of day', /Good (morning|afternoon|evening|night)!|Still up\?/.test(D.querySelector('#splash .splash-greet').textContent),
@@ -52,8 +53,19 @@ w.addEventListener('error', e => errors.push(e.message));
   // onboarding auto-opens on a blank install
   check('setup guide opens on first run', !!sheet() && /Set up Poket Daily/.test($('.sheet-title').textContent));
   check('every sheet has a visible close button', !!q('.sheet-head .icon-btn'), 'x present');
-  byText('.btn', 'Start with accounts').click(); await wait();
-  check('guide step 2 asks for the main spending account', /main spending account/.test(sheet().textContent));
+  byText('.btn', 'Next: your money month').click(); await wait();
+
+  // the cycle step. Pick a start day that guarantees today is PAST it, so the
+  // mid-cycle step below is reached whatever date this harness runs on.
+  check('guide asks when the money month starts', /When does your money month start/.test(sheet().textContent));
+  const dayInput = q('input[type=number]');
+  const startDay = w.Cycles.today().getDate() === 1 ? 28 : 1;
+  dayInput.value = String(startDay);
+  dayInput.dispatchEvent(new w.Event('input'));
+  check('cycle step previews the cycle it just described', /This cycle:/.test(sheet().textContent), sheet().textContent.match(/This cycle:[^.]*\./)[0]);
+  byText('.btn', 'Next: accounts').click(); await wait(150);
+  check('cycle start day saved before accounts', w.S.settings.cycleStartDay === startDay, 'day ' + w.S.settings.cycleStartDay);
+  check('guide then asks for the main spending account', /main spending account/.test(sheet().textContent));
 
   // add an account through the real form
   byText('.btn', '+ Add spending account').click(); await wait();
@@ -64,9 +76,27 @@ w.addEventListener('error', e => errors.push(e.message));
   check('account saved from the form', w.S.accounts.length === 1 && w.S.accounts[0].startBalance === 2500);
   check('Monthly Balance picks it up immediately', w.Calc.monthlyBalance() === 2500);
 
-  // finish the guide
+  // the mid-cycle step — reached because the cycle start day above guarantees it
   byText('.btn', 'Next: savings').click(); await wait();
-  byText('.btn', 'Next: your plan').click(); await wait();
+  byText('.btn', 'Next: this cycle').click(); await wait();
+  check('guide asks about starting part-way through the cycle',
+    /starting part-way through/.test(sheet().textContent));
+  const midAmount = q('.input-amount');
+  check('mid-cycle amount is prefilled from the account just entered',
+    w.CentInput.value(midAmount) === 2500, w.CentInput.value(midAmount));
+  const midDays = w.Cycles.daysToCycleEnd(w.Cycles.iso(w.Cycles.today()));
+  check('mid-cycle step shows the resulting daily rate',
+    sheet().textContent.indexOf(w.Fmt.money(2500 / midDays) + ' a day') > -1,
+    w.Fmt.money(2500 / midDays) + ' a day over ' + midDays + ' days');
+  byText('.btn', 'Use this for the rest of the cycle').click(); await wait(200);
+  check('stated figure saved as the rule for this cycle',
+    w.S.settings.midCycleMode === 'remaining' && w.S.settings.midCycleRemaining === 2500,
+    w.S.settings.midCycleMode + ' / ' + w.S.settings.midCycleRemaining);
+  check('daily allowance is now the stated figure over the days left',
+    Math.abs(w.Calc.dailyAllowance(w.Cycles.currentCycleKey()) - 2500 / midDays) < 0.01,
+    w.Calc.dailyAllowance(w.Cycles.currentCycleKey()));
+
+  // finish the guide
   check('guide closes on the Plan hand-off', /Open the Plan tab/.test(sheet().textContent));
   byText('.btn', 'Open the Plan tab').click(); await wait(150);
   check('guide marks itself done', w.S.settings.onboarded === true);
@@ -112,6 +142,39 @@ w.addEventListener('error', e => errors.push(e.message));
   w.Settings.open(); await wait();
   check('settings offers backup and restore', /Download full backup/.test(sheet().textContent) && /Restore from backup/.test(sheet().textContent));
   check('settings can reorder the tabs', !!sheet().querySelector('.order-list'));
+  // the mid-cycle rule set during onboarding must be correctable here
+  check('settings exposes the This cycle controls', /This cycle/.test(sheet().textContent) &&
+    /Spread what I had left/.test(sheet().textContent));
+  check('and shows the current spread rate', /a day across \d+ day/.test(sheet().textContent),
+    (sheet().textContent.match(/[^.]*a day across[^.]*\./) || [''])[0].trim());
+  byText('.seg', 'Normal monthly rate').click(); await wait();
+  byText('.btn', 'Save settings').click(); await wait(200);
+  check('switching back to the monthly rate clears the spread',
+    w.S.settings.midCycleMode === 'prorate', w.S.settings.midCycleMode);
+  check('and the allowance reverts to the Plan pool over the whole cycle',
+    Math.abs(w.Calc.dailyAllowance(w.Cycles.currentCycleKey()) -
+      w.Calc.cyclePool(w.Cycles.currentCycleKey()) /
+      w.Cycles.getCycleRangeForKey(w.Cycles.currentCycleKey()).totalDays) < 0.01,
+    w.Calc.dailyAllowance(w.Cycles.currentCycleKey()));
+
+  // the once-only prompt for installs that were already mid-cycle at first boot
+  const curRange = w.Cycles.getCycleRangeForKey(w.Cycles.currentCycleKey());
+  const prevRange = w.Cycles.getCycleRangeForKey(w.Cycles.shiftCycleKey(w.Cycles.currentCycleKey(), -1));
+  await w.Actions.saveSettings({
+    midCycleMode: 'prorate', midCycleAsked: false,
+    midCycleJoinDate: w.Cycles.iso(w.Cycles.addDays(curRange.start, 1))
+  });
+  check('an unanswered mid-cycle join in the current cycle is prompted once',
+    w.Onboarding.midCyclePending() === true);
+  await w.Actions.saveSettings({ midCycleAsked: true });
+  check('and never prompts again once answered', w.Onboarding.midCyclePending() === false);
+  await w.Actions.saveSettings({
+    midCycleAsked: false,
+    midCycleJoinDate: w.Cycles.iso(w.Cycles.addDays(prevRange.start, 1))
+  });
+  check('a join date from an older cycle is deliberately left alone',
+    w.Onboarding.midCyclePending() === false);
+  await w.Actions.saveSettings({ midCycleAsked: true, midCycleJoinDate: null });
 
   // delete with undo
   const id = w.S.logs.filter(l => !l.transferPairId)[0].id;

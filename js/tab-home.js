@@ -8,16 +8,23 @@
     var r = C.getCycleRangeForKey(cycleKey);
     var allowance = Calc.dailyAllowance(cycleKey);
     var todayIso = C.iso(C.today());
+    /* Days before budgeting began carry no allowance, so they must not be
+       judged against one. Read the rule directly rather than off today's
+       dailyBudget, so the strip is still right when a past cycle is in view.
+       Bar count still comes from totalDays. */
+    var m = Calc.midCycle();
+    var joinIso = (m && m.cycleKey === String(cycleKey)) ? m.joinIso : null;
     var bars = [], cur = r.startIso;
     for (var i = 0; i < r.totalDays; i++) {
       var spend = Calc.budgetDrainOnDay(cur);
+      var pre = !!joinIso && cur < joinIso;
       bars.push({
         iso: cur,
         label: C.dateLabel(cur),
         spend: Math.max(0, spend),
         spendLabel: Fmt.money(spend),
-        allowance: allowance,
-        state: cur < todayIso ? 'past' : (cur === todayIso ? 'today' : 'future')
+        allowance: pre ? 0 : allowance,
+        state: pre ? 'pre' : (cur < todayIso ? 'past' : (cur === todayIso ? 'today' : 'future'))
       });
       cur = C.iso(C.addDays(cur, 1));
     }
@@ -26,6 +33,12 @@
 
   function coachLine(db, summary) {
     if (!root.S.accounts.length) return 'Add your accounts first — Monthly Balance reads straight from them.';
+    /* Ahead of the no-Plan line: a mid-cycle joiner has a real budget from the
+       figure they stated, even with an empty Plan. */
+    if (db.midCycleJoinIso && !summary.plannedIncome) {
+      return 'Running on what you had left when you started. Set up your Plan for ' +
+        C.cycleLabel(C.shiftCycleKey(db.cycleKey, 1)) + ' onwards.';
+    }
     if (!summary.plannedIncome) return 'Set up your Plan to turn on the daily budget.';
     if (db.carry < -0.5) return 'You are ' + Fmt.money(Math.abs(db.carry)) + ' behind your plan. Today\'s figure already absorbs it.';
     if (db.carry > 0.5) return Fmt.money(db.carry) + ' rolled over from earlier days, so today has more room.';
@@ -113,6 +126,18 @@
       el('span', { text: db.daysLeft + ' of ' + db.totalDays + ' days left' })
     ]));
     host.appendChild(hero);
+
+    /* The joining cycle's allowance comes from a stated figure, so it will not
+       reconcile with the Plan pool shown further down. Say why. */
+    if (db.midCycleJoinIso) {
+      host.appendChild(el('p', {
+        class: 'card-note',
+        text: 'Started ' + C.dateLabel(db.midCycleJoinIso) + ' · spreading the ' +
+          Fmt.money(db.effectivePool) + ' you had left over ' + db.midCycleDays +
+          ' day' + (db.midCycleDays === 1 ? '' : 's') + '. Your Plan takes over on ' +
+          C.dateLabel(C.getCycleRangeForKey(C.shiftCycleKey(db.cycleKey, 1)).startIso) + '.'
+      }));
+    }
 
     host.appendChild(el('p', { class: 'coach', text: coachLine(db, summary) }));
 

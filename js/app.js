@@ -44,6 +44,13 @@
       cardStyle: 'flat',
       categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
       budgetStartDate: null,
+      /* Joining part-way through a cycle — see Calc.midCycle().
+         'prorate' is the historical behaviour: pool spread over the whole
+         cycle. Nothing derived is stored, only the join DATE. */
+      midCycleMode: 'prorate',
+      midCycleJoinDate: null,
+      midCycleRemaining: null,
+      midCycleAsked: false,
       lastSplashDate: null,
       navOrder: DEFAULT_NAV.slice(),
       onboarded: false
@@ -190,6 +197,10 @@
       root.Splash.run().then(function () {
         if (!root.S.settings.onboarded && !root.S.accounts.length) {
           setTimeout(function () { root.Onboarding.open(0); }, 300);
+        } else if (root.Onboarding.midCyclePending()) {
+          /* Installed part-way through the cycle they are still in, and never
+             asked about it. Both buttons on that sheet latch midCycleAsked. */
+          setTimeout(function () { root.Onboarding.midCycle(); }, 300);
         }
       });
       if ('serviceWorker' in navigator) {
