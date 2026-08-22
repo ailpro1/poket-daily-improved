@@ -1,0 +1,194 @@
+/* ===== KEYFRAMES ===== */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes itemSlideIn {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes bounceIn {
+  0%   { transform: scale(0.8); opacity: 0; }
+  60%  { transform: scale(1.08); opacity: 1; }
+  80%  { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.04); }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(76,175,110,0); }
+  50%       { box-shadow: 0 0 0 8px rgba(76,175,110,0.2); }
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.9); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes toastOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(-16px) scale(0.9); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  15%       { transform: translateX(-8px); }
+  30%       { transform: translateX(8px); }
+  45%       { transform: translateX(-6px); }
+  60%       { transform: translateX(6px); }
+  75%       { transform: translateX(-3px); }
+  90%       { transform: translateX(3px); }
+}
+
+@keyframes countUp {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes ripple {
+  to { transform: scale(4); opacity: 0; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes slideFromRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideFromLeft {
+  from { transform: translateX(-100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes flashBalance {
+  0%   { transform: scale(1); }
+  25%  { transform: scale(1.06); }
+  50%  { transform: scale(0.97); }
+  75%  { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+@keyframes scoreReveal {
+  from { stroke-dashoffset: 188.5; }
+}
+
+/* ===== UTILITY ANIMATION CLASSES ===== */
+.animate-bounce-in { animation: bounceIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.animate-pulse     { animation: pulse 2s ease-in-out infinite; }
+.animate-glow      { animation: glow 2s ease-in-out infinite; }
+.animate-shake     { animation: shake 0.5s ease; }
+.animate-count-up  { animation: countUp 0.3s ease; }
+.animate-spin      { animation: spin 0.6s linear; }
+
+/* Balance card animation on change */
+.balance-flash {
+  animation: flashBalance 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Ripple effect on buttons */
+.btn-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-ripple::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: rgba(255,255,255,0.5);
+  border-radius: 50%;
+  transform: scale(0);
+  pointer-events: none;
+}
+
+.btn-ripple:active::after {
+  animation: ripple 0.5s ease-out;
+}
+
+/* Number count-up animation for amounts */
+.num-change {
+  display: inline-block;
+  animation: countUp 0.25s ease both;
+}
+
+/* Card hover lift */
+.card-hover {
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Staggered list animations */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+
+/* ===== BINDINGS FOR THIS APP'S CLASS NAMES =====
+   The reference sheet targets poketdailytest markup (.balance-card,
+   .budget-item, .checklist-item, .tab-panel). The same behaviour, bound to
+   the class names this app actually renders. */
+
+/* Figures transition colour and settle with a slight overshoot */
+.hero-value,
+.bal-value,
+.plan-pool,
+.acc-detail-bal {
+  transition: color 0.4s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Card flash when a balance changes — add/remove .balance-flash in js */
+.hero.balance-flash,
+.bal-card.balance-flash { animation: flashBalance 0.45s cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* Page/tab swap */
+.page { animation: fadeSlideIn 0.3s ease both; }
+
+/* List rows slide in; .removing plays the delete exit */
+.log-row,
+.cat-row,
+.plan-row,
+.check-row,
+.kv li,
+.mini-list li { animation: itemSlideIn 0.3s ease both; }
+
+.log-row.removing,
+.plan-row.removing,
+.cat-row.removing { animation: removeItem 0.3s ease forwards; }
+
+@keyframes removeItem {
+  to { opacity: 0; transform: translateX(32px); height: 0; padding: 0; margin: 0; }
+}
+
+/* Checklist tick pops */
+.check-row.completing .check-box { animation: bounceIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* Charts and hero fade up on load */
+.chart-holder,
+.hero,
+.card { animation: fadeSlideIn 0.4s ease both; }
+
+/* Doughnut ring draw */
+.dn-ring { animation: scoreReveal 1s cubic-bezier(0.4, 0, 0.2, 1) 0.3s both; }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

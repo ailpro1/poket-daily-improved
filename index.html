@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Poket Daily</title>
+<meta name="description" content="Daily spending budget and multi-account tracker that works offline.">
+<meta name="theme-color" content="#FAFAFA">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Poket Daily">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192">
+<link rel="icon" href="icons/icon-512.png" sizes="512x512">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/animations.css">
+</head>
+<body>
+
+<div id="splash" role="dialog" aria-label="Today's budget">
+  <div class="splash-art">
+    <img class="splash-art-img" src="icons/splash.png" width="853" height="1844"
+         alt="Poket Daily — plan today, save tomorrow, live better.">
+  </div>
+  <div class="splash-inner">
+    <span class="splash-emoji" aria-hidden="true"></span>
+    <h1 class="splash-greet"></h1>
+    <p class="splash-label"></p>
+    <p class="splash-amount">
+      <span class="splash-cur"></span><span class="splash-num num"></span>
+    </p>
+    <button class="splash-go" type="button">Let's go</button>
+  </div>
+  <span class="splash-boot">Poket Daily</span>
+</div>
+
+<header id="app-head"></header>
+<main id="app-main"></main>
+<nav id="app-nav" aria-label="Sections"></nav>
+
+<button id="fab" aria-label="Log a transaction">+</button>
+<div id="toast-host" aria-live="polite"></div>
+
+<script src="js/db.js"></script>
+<script src="js/format.js"></script>
+<script src="js/cycles.js"></script>
+<script src="js/calc.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/actions.js"></script>
+<script src="js/forms.js"></script>
+<script src="js/checklist.js"></script>
+<script src="js/tab-home.js"></script>
+<script src="js/tab-log.js"></script>
+<script src="js/tab-plan.js"></script>
+<script src="js/tab-accounts.js"></script>
+<script src="js/tab-breakdown.js"></script>
+<script src="js/splash.js"></script>
+<script src="js/onboarding.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

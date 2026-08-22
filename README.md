@@ -1,1 +1,129 @@
-# poket-daily-improved
+# Poket Daily
+
+A personal daily-spending-budget and multi-account tracker. Plain HTML, CSS and
+vanilla JavaScript — no framework, no bundler, no build step. Open `index.html`
+in a browser and it runs. Storage is IndexedDB, so it works fully offline and
+installs as a PWA.
+
+## Running it
+
+- **Locally:** open `index.html`. Everything works except the service worker,
+  which browsers only register over `http(s)` or `localhost`.
+- **With offline install:** serve the folder over HTTP, e.g.
+  `python3 -m http.server 8000`, then open `http://localhost:8000` and use your
+  browser's "Install app" / "Add to Home Screen".
+- **Hosting:** upload the folder as-is to any static host. All paths are relative.
+
+Do not open it from a `file://` URL if you want the PWA behaviour — IndexedDB
+works, but service workers do not.
+
+## How the numbers hold together
+
+Every figure in the app comes out of `js/calc.js`. No tab, card, total or chart
+does its own money maths. Every date-range question goes through
+`js/cycles.js` (`getMonthKey`, `getCycleRangeForKey`). Those two files are the
+only places arithmetic lives, which is what stops one tab quietly disagreeing
+with another.
+
+There are two deliberately different kinds of number:
+
+| | Question it answers | How it is built |
+|---|---|---|
+| **Monthly Balance** / **Savings Balance** | "What do I actually have?" | Live sum of `accountBalance()` across general / saving accounts |
+| **Daily Spending Budget** | "What can I safely spend today?" | `(planned income − commitments − savings) ÷ days`, adjusted for real activity and carry-over |
+
+### The double-counting rule
+
+The daily budget pool already subtracts planned commitments and savings. So the
+transactions created by ticking the Checklist (`sourceChecklistId` set) are
+**excluded** from the daily budget and the Breakdown tab. They are still real
+money and still move account balances, and they still appear in the Log tab's
+"out this cycle" total. `Calc.affectsBudget()` is the single predicate for this;
+everything that needs the rule calls it.
+
+### Carry-over
+
+`Calc.carryInto(date)` walks every day from the day budgeting actually began up
+to the given day, accumulating `allowance − real spend`. That one walk produces
+both within-cycle and across-cycle carry-over, so a surplus or deficit never
+resets at a cycle boundary. `Calc.firstActivityIso()` is the lower bound, so
+today's plan is never applied retroactively to days before the user had one.
+
+### Transfers
+
+A transfer is always two linked logs sharing a `transferPairId` — one
+`transfer_out`, one `transfer_in`. Deleting one deletes both. General→general
+leaves Monthly Balance flat; general→saving moves both totals by the same
+amount in opposite directions.
+
+### Graphs
+
+Charts call `Calc.accountBalance(id, upToDate)` per period rather than
+approximating, so a chart's value for a date always equals the Home card's value
+for that date. The x-axis lower bound is `firstActivityIso()`, never an empty
+fixed window.
+
+## File map
+
+```
+index.html              app shell, script order
+css/app.css             all styling and theme tokens
+sw.js                   service worker; ASSETS must list every shipped file
+manifest.webmanifest    PWA manifest
+js/db.js                IndexedDB access only
+js/format.js            money formatting + cent-first POS-style input
+js/cycles.js            all cycle/date maths
+js/calc.js              all money maths — single source of truth
+js/actions.js           every write to state (persist + invalidate + re-render)
+js/ui.js                sheets, toasts, undo snackbar, form primitives
+js/charts.js            hand-rolled SVG line, doughnut and day-strip charts
+js/forms.js             transaction, transfer, account and plan-item sheets
+js/checklist.js         per-cycle checklist drawer
+js/tab-*.js             Home, Log, Plan, Accounts, Breakdown
+js/onboarding.js        first-run guide (accounts before plan)
+js/settings.js          preferences, JSON backup/restore, plan CSV
+js/app.js               state load, routing, header, nav, theme, SW registration
+```
+
+Adding a JS or CSS file means adding it to **both** `index.html` and the
+`ASSETS` array in `sw.js`, or offline mode silently breaks.
+`node tools/check-cache.js` catches that.
+
+## Tests
+
+Development-only; nothing in `tools/` ships or is referenced by the app.
+
+```bash
+node tools/selfcheck.js     # the spec's 7-step scenario against calc.js directly
+node tools/check-cache.js   # every asset is in the service worker precache
+node tools/smoke.js         # boots the app in jsdom, reads numbers back off the DOM
+node tools/smoke-ui.js      # opens every sheet, submits every form
+node tools/smoke-splash.js  # greeting by hour, budget figure, once-per-day rule
+```
+
+The last two need jsdom and fake-indexeddb (`npm i jsdom fake-indexeddb`) and
+expect them in a `node_modules` alongside the project; adjust the require paths
+at the top of each file if yours sit elsewhere.
+
+`smoke.js` asserts the full self-check scenario through the rendered UI: account
+cards summing to the Home balance cards, Log-tab totals, breakdown footing to
+the same discretionary total, checklist self-healing, undo, per-cycle overrides,
+`endMonth`, and survival across a reload from IndexedDB.
+
+## Data and backups
+
+Everything stays on the device. Settings → **Download full backup (JSON)**
+captures every store (budget, logs, accounts, settings and categories, checklist
+state); **Restore from backup** wipes and rebuilds all of it, then re-initialises
+the in-memory state. There is also a human-readable CSV export of the Plan.
+
+## Notes on a few choices
+
+- **Cycle key** is the `YYYY-MM` of the cycle's *start* month. With a cycle start
+  day of 25, `2026-01` means 25 Jan → 24 Feb 2026.
+- **Cycle start day** is capped at 28 so every month has one.
+- **Dates** are handled at local noon internally, so daylight saving never shifts
+  a day; they are stored as `YYYY-MM-DD` strings.
+- **Bottom nav** defaults to Home, Log, Plan, Accounts, Breakdown, and is
+  reorderable in Settings.
+- **No browser storage APIs** beyond IndexedDB — no localStorage anywhere.
