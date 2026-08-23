@@ -88,7 +88,11 @@
       var large = (a1 - a0) > Math.PI ? 1 : 0;
       var p = function (ang, rad) { return [(cx + rad * Math.cos(ang)).toFixed(2), (cy + rad * Math.sin(ang)).toFixed(2)]; };
       var o0 = p(a0, r - 2), o1 = p(a1, r - 2), i1 = p(a1, inner), i0 = p(a0, inner);
-      out += '<path class="slice" fill="var(--cat-' + (i % 8) + ')" d="M' + o0 + ' A' + (r - 2) + ',' + (r - 2) + ' 0 ' + large + ' 1 ' + o1 +
+      /* data-i is how the Breakdown tab ties a slice to its list row; the
+         path is focusable so the chart is usable without a pointer. */
+      out += '<path class="slice" data-i="' + i + '" tabindex="0" role="button"' +
+        ' aria-label="' + esc(s.name) + '" fill="var(--cat-' + (i % 8) + ')" d="M' + o0 +
+        ' A' + (r - 2) + ',' + (r - 2) + ' 0 ' + large + ' 1 ' + o1 +
         ' L' + i1 + ' A' + inner + ',' + inner + ' 0 ' + large + ' 0 ' + i0 + ' Z"><title>' + esc(s.name) + '</title></path>';
       a0 = a1;
     });

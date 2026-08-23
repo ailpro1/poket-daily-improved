@@ -51,6 +51,9 @@
       midCycleJoinDate: null,
       midCycleRemaining: null,
       midCycleAsked: false,
+      /* How a surplus or shortfall behaves at a cycle boundary — see
+         Calc.carryMode(). 'on' is the historical behaviour. */
+      carryOver: 'on',
       lastSplashDate: null,
       navOrder: DEFAULT_NAV.slice(),
       onboarded: false

@@ -171,6 +171,14 @@
 
         var mid = midCycleSection(body);
 
+        var carry = UI.select([
+          { value: 'on', label: 'Surplus and shortfall both roll over' },
+          { value: 'surplus', label: 'Only surplus rolls over' },
+          { value: 'off', label: 'Every cycle starts fresh' }
+        ], root.S.settings.carryOver || 'on');
+        body.appendChild(UI.field('Carry over from last cycle', carry,
+          'Rolling both over is the honest one: underspending gives today more room, overspending takes it away. Keeping only the surplus means nothing ever absorbs an overspend, so the daily figure can only flatter you.'));
+
         var theme = UI.select(
           [{ value: 'system', label: 'Match my phone' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
           root.S.settings.theme
@@ -193,6 +201,7 @@
               var patch = {
                 currency: cur.value.trim() || 'RM',
                 cycleStartDay: day,
+                carryOver: carry.value,
                 theme: theme.value,
                 cardStyle: cardStyle.value
               };

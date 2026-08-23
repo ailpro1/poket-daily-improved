@@ -1,16 +1,19 @@
-/* tab-breakdown.js — where the cycle's money went.
+/* tab-breakdown.js — where the cycle's money went, and where it came from.
 
-   Two deliberately different halves, because the daily budget draws the same
-   line (see the double-counting rule in the README):
+   Three views, drawn from three different halves of the same rule (the
+   double-counting rule in the README):
 
-     Spendable  — discretionary spend by category, via Calc.categoryTotals().
-                  Excludes anything ticked off the Plan, so on its own it can
-                  never account for a whole cycle.
-     Committed  — the other half: Plan commitments and savings per item, via
-                  Calc.planBreakdown(). Income is excluded — it is money
-                  arriving, not money going somewhere.
+     Spendable  discretionary spend by category — Calc.categoryTotals().
+                Excludes anything ticked off the Plan, so on its own it can
+                never account for a whole cycle.
+     Committed  the other half of money out: Plan commitments and savings per
+                item, with what has been ticked off — Calc.planBreakdown().
+     Money in   planned income per item PLUS anything logged by hand —
+                Calc.incomeBreakdown(). A ticked-off plan item is counted
+                once, as the item; its checklist log stays excluded.
 
-   Money in stays as the logged-income view it always was. */
+   Every chart is tappable: pick a slice or a row and the middle of the
+   doughnut reads that one back. */
 (function (root) {
   'use strict';
 
@@ -19,30 +22,78 @@
 
   var SECTION_LABEL = { commitments: 'Commitment', savings: 'Savings' };
 
-  function chartCard(items, centerTop, centerSub, note) {
-    return el('section', { class: 'card' }, [
-      el('div', {
-        class: 'chart-holder',
-        html: root.Charts.doughnut(items, { size: 200, centerTop: centerTop, centerSub: centerSub })
-      }),
-      el('p', { class: 'card-note', text: note })
-    ]);
+  /* Long names would run out of a 200px doughnut. */
+  function fitCentre(name) {
+    var n = String(name || '');
+    return n.length > 15 ? n.slice(0, 14) + '…' : n;
   }
 
-  /* Shared list + share-bar rendering. `meta` builds each row's sub-line. */
-  function itemList(items, meta) {
+  /* Ties one doughnut to one list so a tap on either highlights both, and
+     the centre of the chart reads back whatever is selected. */
+  function makeChart(items, centreTop, centreSub, note, rowMeta) {
+    var holder = el('div', {
+      class: 'chart-holder',
+      html: root.Charts.doughnut(items, { size: 200, centerTop: centreTop, centerSub: centreSub })
+    });
+    var card = el('section', { class: 'card' }, [holder]);
     var list = el('ul', { class: 'cat-list' });
+
+    var svg = holder.querySelector('.doughnut');
+    var top = svg && svg.querySelector('.dn-top');
+    var sub = svg && svg.querySelector('.dn-sub');
+    var slices = svg ? UI.$$('.slice', svg) : [];
+    var rows = [];
+    var picked = -1;
+
+    function paint() {
+      if (svg) svg.classList.toggle('has-sel', picked >= 0);
+      slices.forEach(function (p, i) { p.classList.toggle('on', i === picked); });
+      rows.forEach(function (rw, i) {
+        rw.classList.toggle('on', i === picked);
+        rw.setAttribute('aria-pressed', i === picked ? 'true' : 'false');
+      });
+      if (!top || !sub) return;
+      if (picked < 0) {
+        top.textContent = centreTop;
+        sub.textContent = centreSub;
+      } else {
+        top.textContent = Fmt.moneyShort(items[picked].amount);
+        sub.textContent = fitCentre(items[picked].name);
+      }
+    }
+
+    /* Tapping the same thing twice clears it, so there is always a way back
+       to the total without hunting for a close button. */
+    function pick(i) { picked = (picked === i) ? -1 : i; paint(); }
+
+    slices.forEach(function (p, i) {
+      p.addEventListener('click', function () { pick(i); });
+      p.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(i); }
+      });
+    });
+
     items.forEach(function (c, i) {
-      list.appendChild(el('li', { class: 'cat-row' }, [
+      var rw = el('li', {
+        class: 'cat-row tappable', tabindex: '0', role: 'button', 'aria-pressed': 'false',
+        onclick: function () { pick(i); },
+        onkeydown: function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(i); } }
+      }, [
         el('span', { class: 'cat-dot', style: 'background:var(--cat-' + (i % 8) + ')' }),
         el('span', { class: 'cat-main' }, [
           el('span', { class: 'cat-name', text: c.name }),
-          el('span', { class: 'log-meta', text: meta(c) })
+          el('span', { class: 'log-meta', text: rowMeta(c) })
         ]),
         el('b', { class: 'num', text: Fmt.money(c.amount) })
-      ]));
+      ]);
+      rows.push(rw);
+      list.appendChild(rw);
     });
-    return list;
+
+    if (items.length) card.appendChild(el('p', { class: 'cat-hint', text: 'Tap a slice to read it on its own.' }));
+    card.appendChild(el('p', { class: 'card-note', text: note }));
+    paint();
+    return { card: card, list: list };
   }
 
   function shareBars(items, title) {
@@ -61,85 +112,90 @@
     return bars;
   }
 
-  /* ---------- logged transactions, by category --------------------------- */
+  function statRow(pairs) {
+    return el('div', { class: 'totals-row' }, pairs.map(function (p) {
+      return el('div', { class: 'stat' }, [
+        el('span', { class: 'eyebrow', text: p[0] }),
+        el('b', { class: 'num stat-value', text: Fmt.money(p[1]) })
+      ]);
+    }));
+  }
 
-  function renderLogged(host, cycleKey, kind) {
+  function draw(host, items, centreTop, centreSub, note, rowMeta, barsTitle) {
+    var built = makeChart(items, centreTop, centreSub, note, rowMeta);
+    host.appendChild(built.card);
+    if (!items.length) return false;
+    host.appendChild(built.list);
+    host.appendChild(shareBars(items, barsTitle));
+    return true;
+  }
+
+  /* ---------- spendable: day-to-day spending by category ----------------- */
+
+  function renderSpendable(host, cycleKey) {
     var r = C.getCycleRangeForKey(cycleKey);
-    var data = Calc.categoryTotals(r.startIso, r.endIso, kind);
-    var spending = kind === 'expense';
-
-    host.appendChild(chartCard(
-      data.items, Fmt.moneyShort(data.total), spending ? 'spendable' : 'received',
-      spending
-        ? 'Day-to-day spending only. Anything ticked off your Plan sits under Committed instead — the same rule the daily budget uses, so this total always matches.'
-        : 'Income you logged yourself. Planned income you ticked off the checklist is not counted twice.'
-    ));
-
-    if (!data.items.length) {
+    var data = Calc.categoryTotals(r.startIso, r.endIso, 'expense');
+    var drawn = draw(host, data.items, Fmt.moneyShort(data.total), 'spendable',
+      'Day-to-day spending only. Anything ticked off your Plan sits under Committed instead — the same rule the daily budget uses, so this total always matches.',
+      function (c) { return Math.round(c.share * 100) + '% · ' + c.count + ' item' + (c.count === 1 ? '' : 's'); },
+      'Share of spending');
+    if (!drawn) {
       host.appendChild(UI.emptyState('Nothing to break down',
         'Log a few transactions with categories and they show up here.', 'Log a transaction',
         function () { root.Forms.transaction(); }));
-      return;
     }
-
-    host.appendChild(itemList(data.items, function (c) {
-      return Math.round(c.share * 100) + '% · ' + c.count + ' item' + (c.count === 1 ? '' : 's');
-    }));
-    host.appendChild(shareBars(data.items, 'Share of ' + (spending ? 'spending' : 'income')));
   }
 
-  /* ---------- committed money, by plan item ------------------------------ */
+  /* ---------- committed: plan commitments and savings -------------------- */
 
   function renderCommitted(host, cycleKey) {
     var data = Calc.planBreakdown(cycleKey);
-
-    host.appendChild(chartCard(
-      data.items, Fmt.moneyShort(data.total), 'committed',
-      'Commitments and savings from your Plan for this cycle. The daily budget already subtracts all of it, which is why none of it shows under Spendable.'
-    ));
-
-    if (!data.items.length) {
+    var drawn = draw(host, data.items, Fmt.moneyShort(data.total), 'committed',
+      'Commitments and savings from your Plan for this cycle. The daily budget already subtracts all of it, which is why none of it shows under Spendable.',
+      function (c) {
+        return SECTION_LABEL[c.section] + ' · ' + Math.round(c.share * 100) + '% · ' +
+          (c.paid ? 'ticked off' : 'not yet paid');
+      },
+      'Share of committed money');
+    if (!drawn) {
       host.appendChild(UI.emptyState('Nothing committed this cycle',
         'Add commitments and savings goals to your Plan and they show up here.', 'Open the Plan tab',
         function () { root.App.go('plan'); }));
       return;
     }
-
-    /* Committed money splits again: what has actually left the account this
-       cycle, and what is still to come. */
     host.appendChild(el('section', { class: 'card totals' }, [
-      el('div', { class: 'totals-row' }, [
-        el('div', { class: 'stat' }, [
-          el('span', { class: 'eyebrow', text: 'Ticked off' }),
-          el('b', { class: 'num stat-value', text: Fmt.money(data.paid) })
-        ]),
-        el('div', { class: 'stat' }, [
-          el('span', { class: 'eyebrow', text: 'Still to pay' }),
-          el('b', { class: 'num stat-value', text: Fmt.money(data.unpaid) })
-        ])
-      ]),
+      statRow([['Ticked off', data.paid], ['Still to pay', data.unpaid]]),
       el('div', { class: 'kv-split' }),
-      el('div', { class: 'totals-row' }, [
-        el('div', { class: 'stat' }, [
-          el('span', { class: 'eyebrow', text: 'Commitments' }),
-          el('b', { class: 'num stat-value', text: Fmt.money(data.commitments) })
-        ]),
-        el('div', { class: 'stat' }, [
-          el('span', { class: 'eyebrow', text: 'Savings' }),
-          el('b', { class: 'num stat-value', text: Fmt.money(data.savings) })
-        ])
-      ]),
+      statRow([['Commitments', data.commitments], ['Savings', data.savings]]),
       el('button', {
         class: 'btn btn-ghost btn-block', text: 'Open checklist',
         onclick: function () { root.Checklist.open(); }
       })
     ]));
+  }
 
-    host.appendChild(itemList(data.items, function (c) {
-      return SECTION_LABEL[c.section] + ' · ' + Math.round(c.share * 100) + '% · ' +
-        (c.paid ? 'ticked off' : 'not yet paid');
-    }));
-    host.appendChild(shareBars(data.items, 'Share of committed money'));
+  /* ---------- money in: planned income plus anything logged ------------- */
+
+  function renderIncome(host, cycleKey) {
+    var data = Calc.incomeBreakdown(cycleKey);
+    var drawn = draw(host, data.items, Fmt.moneyShort(data.total), 'money in',
+      'Your Plan\'s income alongside anything you logged by hand. A planned item you ticked off is counted once, as the item — its transaction is not added on top.',
+      function (c) {
+        return (c.kind === 'plan' ? 'Planned' : 'Logged') + ' · ' + Math.round(c.share * 100) + '% · ' +
+          (c.received ? 'received' : 'not in yet');
+      },
+      'Share of money in');
+    if (!drawn) {
+      host.appendChild(UI.emptyState('No money in this cycle',
+        'Add your income to the Plan, or log what came in.', 'Open the Plan tab',
+        function () { root.App.go('plan'); }));
+      return;
+    }
+    host.appendChild(el('section', { class: 'card totals' }, [
+      statRow([['Received', data.received], ['Still to come', data.due]]),
+      el('div', { class: 'kv-split' }),
+      statRow([['From the Plan', data.planned], ['Logged by hand', data.unplanned]])
+    ]));
   }
 
   function render(host) {
@@ -154,7 +210,8 @@
     ));
 
     if (view === 'committed') renderCommitted(host, cycleKey);
-    else renderLogged(host, cycleKey, view === 'income' ? 'income' : 'expense');
+    else if (view === 'income') renderIncome(host, cycleKey);
+    else renderSpendable(host, cycleKey);
   }
 
   root.TabBreakdown = { render: render };

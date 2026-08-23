@@ -151,6 +151,67 @@ const eq = (label, a, b) => check(label, Math.abs(a - b) < 0.02, 'got=' + a + ' 
     /Commitment · \d+% · ticked off/.test(txt('#app-main')) &&
     /Savings · \d+% · ticked off/.test(txt('#app-main')));
 
+  /* A second income source, so Money in has more than one slice to pick
+     between — and one hand-logged item alongside the planned salary. */
+  await Actions.savePlanItem('income', { id: 'i2', name: 'Freelance', amount: 700, accountId: 'a1', dueType: 'day', dueDay: 20, cycleOverrides: {} });
+  await Actions.addLog({ name: 'Angpau', amount: 300, type: 'income', date: day, accountId: 'a1', categoryId: 'cat_other', categoryName: 'Other' });
+
+  /* Money in must include the Plan's income, not just hand-logged income.
+     A ticked-off plan item is counted once — as the item, not its log. */
+  [...w.document.querySelectorAll('.seg')].filter(b => b.textContent === 'Money in')[0].click();
+  await wait(60);
+  const inRows = [...w.document.querySelectorAll('.cat-row .cat-name')].map(n => n.textContent);
+  const ib = Calc.incomeBreakdown(cycle);
+  check('money in lists the Plan income item', inRows.includes('Salary'), inRows);
+  eq('income total = planned + hand-logged', ib.total, ib.planned + ib.unplanned);
+  /* Recomputed: cs was captured before Freelance was added. */
+  eq('and the planned side is the Plan total', ib.planned, Calc.cycleSummary(cycle).plannedIncome);
+  check('the Plan item appears exactly once, not also as its checklist log',
+    ib.items.filter(i => i.name === 'Salary').length === 1, ib.items.map(i => i.name + ':' + i.kind));
+  eq('received + still to come = the whole total', ib.received + ib.due, ib.total);
+
+  /* The chart is tappable: a slice selects, its row lights up, the centre
+     reads that one back, and tapping again clears it. */
+  const dn = w.document.querySelector('.doughnut');
+  const slices = [...w.document.querySelectorAll('.doughnut .slice')];
+  check('there is more than one slice to pick between', slices.length > 1, slices.length + ' slices');
+  check('every slice is focusable and carries its index',
+    slices.length === ib.items.length && slices.every((p, i) => p.getAttribute('data-i') === String(i)
+      && p.getAttribute('tabindex') === '0'), slices.length + ' slices');
+  check('planned and hand-logged income sit side by side',
+    ib.items.some(i => i.kind === 'plan') && ib.items.some(i => i.kind === 'logged'),
+    ib.items.map(i => i.name + ':' + i.kind).join(', '));
+  const centreBefore = w.document.querySelector('.dn-top').textContent;
+  slices[0].dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(20);
+  check('tapping a slice marks the chart as having a selection', dn.classList.contains('has-sel'));
+  check('the tapped slice is the one highlighted',
+    slices[0].classList.contains('on') && !slices.slice(1).some(p => p.classList.contains('on')));
+  check('its list row lights up too',
+    w.document.querySelectorAll('.cat-row')[0].classList.contains('on'));
+  eq('the centre now reads that slice, not the total',
+    money(w.document.querySelector('.dn-top').textContent), money(Fmt.moneyShort(ib.items[0].amount)));
+  slices[0].dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(20);
+  check('tapping it again clears the selection', !dn.classList.contains('has-sel'));
+  check('and the centre goes back to the total',
+    w.document.querySelector('.dn-top').textContent === centreBefore,
+    w.document.querySelector('.dn-top').textContent + ' vs ' + centreBefore);
+
+  /* A row is the other way in, and selecting one deselects the other. */
+  const rows = [...w.document.querySelectorAll('.cat-row')];
+  rows[1].dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(20);
+  check('tapping a row selects its slice',
+    slices[1].classList.contains('on') && rows[1].classList.contains('on'));
+  rows[0].dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await wait(20);
+  check('selecting another row releases the first',
+    rows[0].classList.contains('on') && !rows[1].classList.contains('on'));
+
+  [...w.document.querySelectorAll('.seg')].filter(b => b.textContent === 'Committed')[0].click();
+  await wait(60);
+
   /* Untick one and the paid/unpaid split must move with it. */
   await Actions.setChecked(cycle, 'commitments', S.plan.commitments[0], false);
   await wait(60);
