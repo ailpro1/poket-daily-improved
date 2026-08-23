@@ -434,7 +434,6 @@ body.no-scroll { overflow: hidden; }
 
 /* ---------- plan ------------------------------------------------------------ */
 
-.plan-hero { position: relative; }
 .plan-pool {
   margin: 4px 0 0;
   font-size: 30px;
@@ -493,27 +492,11 @@ body.no-scroll { overflow: hidden; }
 .acc-grid.sorting .acc-card { transition: transform .16s ease; }
 
 .acc-detail-head { text-align: center; padding-bottom: 6px; }
-.net-card { position: relative; }
-
-/* Headline accent. It used to be `border-left: 3px solid var(--jade)`, which
-   follows the corner radius — fine in light mode where the other three borders
-   are visible and it reads as an accent on a complete outline, but in dark mode
-   those borders disappear against the page and all that is left is a green
-   hook curling off into space. A bar inset clear of the corners reads as
-   deliberate in both themes, and because it is an element rather than a border
-   it survives the frosted and neumorphism styles untouched. */
-.net-card::before,
-.plan-hero::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 18px;
-  bottom: 18px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: var(--jade);
-  pointer-events: none;
-}
+/* .net-card and .plan-hero are plain cards. They used to carry a jade accent
+   down the left edge — first as border-left, then as an inset bar — but the
+   big figure inside is enough to mark a headline card, and the coloured edge
+   only ever fought whatever card style was active. Both classes are kept as
+   markup hooks; deliberately no accent styling here. */
 .net-worth {
   margin: 4px 0 0;
   font-size: 30px;
