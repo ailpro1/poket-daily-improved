@@ -7,7 +7,7 @@
    old cache until the name changes. Changing it is also what the page
    watches for: a new sw.js installs, skipWaiting() puts it in charge, and
    App.watchForUpdate() shows "App is updating" and reloads once. */
-var CACHE = 'poket-daily-v8';
+var CACHE = 'poket-daily-v9';
 
 var ASSETS = [
   './',

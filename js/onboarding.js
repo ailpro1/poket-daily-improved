@@ -172,11 +172,11 @@
         body.appendChild(el('p', { class: 'ob-copy', text: 'Payday, not the 1st, for most people. Set 25 if your month runs the 25th to the 24th. Every cycle figure in the app is measured from this day.' }));
 
         var day = el('input', {
-          class: 'input', type: 'number', min: '1', max: '28',
+          class: 'input', type: 'number', min: '1', max: '31',
           value: root.S.settings.cycleStartDay
         });
         var preview = el('p', { class: 'ob-copy strong' });
-        function clamped() { return Math.min(28, Math.max(1, parseInt(day.value, 10) || 1)); }
+        function clamped() { return Math.min(31, Math.max(1, parseInt(day.value, 10) || 1)); }
         /* Previewing needs cycleStartDay live, so save on the way out, but
            label from the typed value rather than from settings. */
         function paintPreview() {
@@ -188,7 +188,8 @@
         }
         day.addEventListener('input', paintPreview);
         paintPreview();
-        body.appendChild(UI.field('Cycle starts on day', day, 'Capped at 28 so every month has one.'));
+        body.appendChild(UI.field('Cycle starts on day', day,
+          'Pick 29, 30 or 31 and a month that is too short uses its last day — the same as a bank paying you early.'));
         body.appendChild(preview);
 
         body.appendChild(el('button', {
