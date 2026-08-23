@@ -12,7 +12,16 @@ w.indexedDB = new FDBFactory();
 w.IDBKeyRange = FDBKeyRange;
 w.matchMedia = () => ({ matches: false, addEventListener() { }, removeEventListener() { } });
 w.requestAnimationFrame = cb => setTimeout(() => cb(Date.now()), 0);
-w.scrollTo = () => { };
+/* Track how scrollTo was called (instant number vs {behavior:'smooth'} object)
+   and fake scrollY moving, so the same-tab vs different-tab distinction in
+   App.go() is actually observable. */
+w.__scrollCalls = [];
+Object.defineProperty(w, 'scrollY', { value: 0, writable: true, configurable: true });
+w.scrollTo = (a, b) => {
+  const opts = (a && typeof a === 'object') ? a : { top: b === undefined ? a : b };
+  w.__scrollCalls.push(opts);
+  w.scrollY = opts.top || 0;
+};
 w.prompt = () => 'Kopi';
 w.URL.createObjectURL = () => 'blob:x';
 w.URL.revokeObjectURL = () => { };
@@ -211,6 +220,29 @@ w.addEventListener('error', e => errors.push(e.message));
   check('a join date from an older cycle is deliberately left alone',
     w.Onboarding.midCyclePending() === false);
   await w.Actions.saveSettings({ midCycleAsked: true, midCycleJoinDate: null });
+
+  // re-tapping the active nav tab scrolls to top without tearing the page down;
+  // switching to a different tab still jumps instantly and re-renders.
+  w.App.go('accounts');
+  w.scrollTo(0, 300);
+  const pageBefore = D.querySelector('.page');
+  w.__scrollCalls.length = 0;
+  const accBtn = [...D.querySelectorAll('.nav-btn')].filter(b => /Accounts/.test(b.textContent))[0];
+  accBtn.click();
+  const lastCall = w.__scrollCalls[w.__scrollCalls.length - 1];
+  check('re-tapping the current tab animates to the top', lastCall && lastCall.behavior === 'smooth', lastCall);
+  check('scrollY lands at 0', w.scrollY === 0);
+  check('re-tapping does not tear down the page', D.querySelector('.page') === pageBefore);
+
+  w.scrollTo(0, 300);
+  w.__scrollCalls.length = 0;
+  const homeBtn = [...D.querySelectorAll('.nav-btn')].filter(b => /Home/.test(b.textContent))[0];
+  homeBtn.click();
+  const switchCall = w.__scrollCalls[0];
+  check('switching tabs jumps to the top instantly, not smoothly',
+    switchCall && switchCall.top === 0 && switchCall.behavior !== 'smooth', switchCall);
+  check('switching tabs does re-render the page', D.querySelector('.page') !== pageBefore);
+  check('and lands on the tab that was clicked', /page-home/.test(D.querySelector('.page').className));
 
   // the "app is updating" bar. Service workers do not exist in jsdom, so this
   // covers the part that does: the bar itself, and the promise that a reload
