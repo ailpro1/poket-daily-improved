@@ -168,8 +168,7 @@
           el('span', { class: 'eyebrow', text: 'Savings Balance' }),
           el('b', { class: 'num stat-value', text: Fmt.money(Calc.savingsBalance()) })
         ])
-      ]),
-      el('p', { class: 'card-note', text: 'Spending and saving accounts added together. Each figure is the live sum of the cards below it. Hold a card to drag it into a new order.' })
+      ])
     ]));
 
     group('general', 'Accounts', host);

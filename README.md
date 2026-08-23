@@ -112,6 +112,21 @@ the handoff into the target day's own cycle — a carry landing on a cycle's
 first day crosses no boundary inside the loop at all, which is the case that is
 easy to get wrong. `tools/selfcheck-carry.js` pins all of it.
 
+### Refunds and reimbursements
+
+Tap any logged transaction and it offers **Refund or reimburse**, which writes
+a separate income log (`refundOfLogId` pointing at the original) rather than
+editing the original down — the history keeps both halves. Being ordinary
+income is the whole trick: `budgetDrainOnDay()` nets income off the day's
+spend, so the daily budget gets the money back with no special case.
+
+A refund must never carry `sourceChecklistId`. `affectsBudget()` excludes
+checklist logs, so a refund inheriting that field would credit nothing at all.
+Reimbursing a *planned* commitment still belongs in the budget: the pool
+subtracted the whole commitment, so getting part of it back means that much
+was never really committed. `tools/selfcheck-refund.js` pins both the ordinary
+and the planned case, and the trap.
+
 ### Transfers
 
 A transfer is always two linked logs sharing a `transferPairId` — one
@@ -203,6 +218,7 @@ node tools/selfcheck.js     # the spec's 7-step scenario against calc.js directl
 node tools/selfcheck-midcycle.js  # the mid-cycle-start rule, in isolation
 node tools/selfcheck-cycles.js    # cycle date maths for every start day, 1-31
 node tools/selfcheck-carry.js     # what a surplus or shortfall does at a cycle seam
+node tools/selfcheck-refund.js    # refunds, including reimbursing a planned commitment
 node tools/check-cache.js   # every asset is in the service worker precache
 node tools/release.js --check      # sw.js CACHE was bumped for the assets that changed
 node tools/smoke.js         # boots the app in jsdom, reads numbers back off the DOM
@@ -244,6 +260,14 @@ the in-memory state. There is also a human-readable CSV export of the Plan.
   `tools/selfcheck-cycles.js` asserts that for every start day across six years.
 - **Dates** are handled at local noon internally, so daylight saving never shifts
   a day; they are stored as `YYYY-MM-DD` strings.
-- **Bottom nav** defaults to Home, Log, Plan, Accounts, Breakdown, and is
-  reorderable in Settings.
+- **Bottom nav** defaults to Home, Transaction, Plan, Accounts, Breakdown, and
+  is reorderable in Settings.
+- **Help lives behind the `?`** in the header, one entry per tab in `App.HELP`,
+  so the cards themselves stay short. Anything explaining *how a number works*
+  belongs there; only figures and one-line facts stay on a card.
+- **Card style** (`[data-card-style]` on `<html>`) covers `.card` and
+  `.acc-card` on every tab, not just Home's three headline cards. The
+  neutral variants are built from theme tokens rather than fixed colours. The
+  drifting orbs stay on the headline cards only: they are per-card infinite
+  animations, and a scrolling list of them is noisy and expensive on a phone.
 - **No browser storage APIs** beyond IndexedDB — no localStorage anywhere.

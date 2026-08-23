@@ -128,14 +128,14 @@
     host.appendChild(hero);
 
     /* The joining cycle's allowance comes from a stated figure, so it will not
-       reconcile with the Plan pool shown further down. Say why. */
+       reconcile with the Plan pool shown further down. Keep the facts here and
+       leave the explanation to the ? sheet. */
     if (db.midCycleJoinIso) {
       host.appendChild(el('p', {
         class: 'card-note',
-        text: 'Started ' + C.dateLabel(db.midCycleJoinIso) + ' · spreading the ' +
-          Fmt.money(db.effectivePool) + ' you had left over ' + db.midCycleDays +
-          ' day' + (db.midCycleDays === 1 ? '' : 's') + '. Your Plan takes over on ' +
-          C.dateLabel(C.getCycleRangeForKey(C.shiftCycleKey(db.cycleKey, 1)).startIso) + '.'
+        text: 'Started ' + C.dateLabel(db.midCycleJoinIso) + ' · ' +
+          Fmt.money(db.effectivePool) + ' over ' + db.midCycleDays +
+          ' day' + (db.midCycleDays === 1 ? '' : 's')
       }));
     }
 

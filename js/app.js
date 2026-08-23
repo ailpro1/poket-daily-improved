@@ -18,7 +18,8 @@
     income: [
       { id: 'cat_salary', name: 'Salary' },
       { id: 'cat_side', name: 'Side income' },
-      { id: 'cat_gift', name: 'Gift' }
+      { id: 'cat_gift', name: 'Gift' },
+      { id: 'cat_refund', name: 'Refund' }
     ],
     expense: [
       { id: 'cat_food', name: 'Food & drink' },
@@ -31,6 +32,83 @@
       { id: 'cat_other', name: 'Other' }
     ]
   };
+
+  /* Per-tab help, so the cards themselves can stay quiet. Reached from the ?
+     in the header, which always shows the tab you are looking at. */
+  var HELP = {
+    home: {
+      title: 'Home',
+      body: [
+        ['Two different kinds of number',
+          'Monthly Balance and Savings Balance are what you actually have — added straight up from your accounts. The daily figure is a forecast built from your Plan. Different job, different number.'],
+        ['Safe to spend today',
+          'Your Plan\'s income minus commitments and savings, divided by the days in the cycle, then adjusted for what you have really spent.'],
+        ['Carry-over',
+          'Underspend and today has more room; overspend and it has less. What happens at the start of a new cycle is your choice under Settings, Carry over from last cycle.'],
+        ['If you started part-way through a cycle',
+          'The figure you said you had left is spread over the days remaining, so the first cycle is honest rather than assuming a whole month. Your Plan takes over from the next cycle. Change it under Settings, This cycle.']
+      ]
+    },
+    log: {
+      title: 'Transaction',
+      body: [
+        ['In and out this cycle',
+          'Every real transaction in the cycle, including the ones ticked off your Plan. Transfers between your own accounts are not counted as either.'],
+        ['Tags on a row',
+          '"from Plan" means it came from ticking the checklist. "spread" means it is shared across the days left in its cycle rather than landing all on one day. "refund" means money that came back on something else.'],
+        ['Getting money back',
+          'Tap any transaction and choose Refund or reimburse. It logs as money in, so the spending cancels out and your account balance goes back up.']
+      ]
+    },
+    plan: {
+      title: 'Plan',
+      body: [
+        ['What the pool is',
+          'Income minus commitments minus savings — what is left to live on. Divided by the days in the cycle, that is your daily budget. It drives the forecast on Home, not your account balances.'],
+        ['Order',
+          'Biggest first, using this cycle\'s amount. An item you have overridden for one cycle moves with it, and one that has ended drops to the bottom.'],
+        ['Ticking things off',
+          'The checklist writes the real transaction against the item\'s account. Untick and that transaction is removed again.']
+      ]
+    },
+    accounts: {
+      title: 'Accounts',
+      body: [
+        ['Net Worth',
+          'Spending and saving accounts added together. All three figures are live sums of the cards below them, so they always agree.'],
+        ['Reordering',
+          'Hold a card, then drag it. The order is saved per group.'],
+        ['Moving money',
+          'A transfer is always two linked halves, so deleting one deletes both and the two balances stay in step.']
+      ]
+    },
+    breakdown: {
+      title: 'Breakdown',
+      body: [
+        ['Spendable',
+          'Day-to-day spending by category. Anything ticked off your Plan is left out, because the daily budget already subtracted it — the same rule, so the totals always match.'],
+        ['Committed',
+          'The other half: commitments and savings from your Plan, per item, with what you have ticked off and what is still to pay.'],
+        ['Money in',
+          'Your Plan\'s income alongside anything you logged by hand. A planned item you ticked off is counted once, as the item — its transaction is not added on top.'],
+        ['The charts',
+          'Tap a slice or a row and the middle of the chart reads that one back. Tap it again to go back to the total.']
+      ]
+    }
+  };
+
+  function openHelp() {
+    var h = HELP[current] || HELP.home;
+    UI.sheet({
+      title: h.title + ' — how it works',
+      render: function (body) {
+        h.body.forEach(function (pair) {
+          body.appendChild(el('span', { class: 'eyebrow', text: pair[0] }));
+          body.appendChild(el('p', { class: 'help-para', text: pair[1] }));
+        });
+      }
+    });
+  }
 
   var current = 'home';
   var viewCycle = null;
@@ -131,6 +209,7 @@
         el('img', { class: 'brand-logo', src: 'icons/logo-wordmark.png', alt: 'Poket Daily', width: '825', height: '185' })
       ]),
       el('div', { class: 'head-actions' }, [
+        el('button', { class: 'icon-btn', 'aria-label': 'How this page works', text: '?', onclick: openHelp }),
         el('button', { class: 'icon-btn', 'aria-label': 'Checklist', text: '☑', onclick: function () { root.Checklist.open(); } }),
         el('button', { class: 'icon-btn', 'aria-label': 'Settings', text: '⚙', onclick: function () { root.Settings.open(); } })
       ])
@@ -308,7 +387,8 @@
     watchForUpdate: watchForUpdate,
     cycleKey: cycleKey, setCycle: setCycle, applyTheme: applyTheme,
     applyCardStyle: applyCardStyle,
-    TABS: TABS, DEFAULT_NAV: DEFAULT_NAV, CARD_STYLES: CARD_STYLES
+    TABS: TABS, DEFAULT_NAV: DEFAULT_NAV, CARD_STYLES: CARD_STYLES,
+    HELP: HELP, openHelp: openHelp
   };
 
   document.addEventListener('DOMContentLoaded', boot);

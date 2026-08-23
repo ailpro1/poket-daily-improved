@@ -85,8 +85,14 @@
       var d = el.dataset.digits || '';
       return d === '' ? 0 : round2(parseInt(d, 10) / 100);
     },
+    /* Set the value from code. It has to paint el.value itself before firing
+       'input': that handler re-reads el.value to catch mobile keyboards, so
+       leaving the old text there made it overwrite the digits we just set and
+       the call did nothing at all. */
     set: function (el, amount) {
-      el.dataset.digits = amount ? String(Math.round(Math.abs(amount) * 100)) : '';
+      var digits = amount ? String(Math.round(Math.abs(amount) * 100)) : '';
+      el.dataset.digits = digits;
+      el.value = digits === '' ? '' : money(parseInt(digits, 10) / 100);
       el.dispatchEvent(new Event('input'));
     }
   };

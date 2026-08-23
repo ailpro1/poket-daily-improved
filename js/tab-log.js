@@ -84,6 +84,8 @@
     var tags = [];
     if (l.spreadType === 'spread') tags.push('spread');
     if (l.sourceChecklistId) tags.push('from Plan');
+    if (l.refundOfLogId) tags.push('refund');
+    else if (root.Actions.refundedTotal(l.id)) tags.push('refunded ' + Fmt.money(root.Actions.refundedTotal(l.id)));
     return el('li', {
       class: 'log-row', tabindex: '0', role: 'button',
       onclick: function () {
