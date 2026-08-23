@@ -295,6 +295,24 @@ w.addEventListener('error', e => errors.push(e.message));
   check('the Breakdown chart card no longer carries its paragraph',
     !/the same rule the daily budget uses/.test(D.querySelector('#app-main').textContent));
 
+  /* The headline accent must stay a real inset bar. As a coloured left border
+     it followed the corner radius, and in dark mode — where the other three
+     borders vanish against the page — all that was left was a green hook
+     curling into space. jsdom does not resolve enough of the cascade to judge
+     computed style here, so assert on the stylesheet itself; how it actually
+     renders is covered in the browser. */
+  /* Comments explain the old device by name, so strip them before matching. */
+  const sheetCss = fs.readFileSync(path.join(root, 'css/app.css'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  check('no card fakes the accent with a coloured left border',
+    !/border-left:\s*3px solid var\(--jade\)/.test(sheetCss));
+  check('nor with an inset jade shadow',
+    !/inset 3px 0 0 var\(--jade\)/.test(sheetCss));
+  check('the accent is a bar inset clear of the corners',
+    /\.net-card::before[\s\S]{0,220}background: var\(--jade\)/.test(sheetCss));
+  check('and the Plan hero shares it',
+    /\.plan-hero::before/.test(sheetCss));
+
   // card style applies beyond Home
   await w.Actions.saveSettings({ cardStyle: 'frosted' });
   w.App.applyCardStyle();

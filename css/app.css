@@ -434,7 +434,7 @@ body.no-scroll { overflow: hidden; }
 
 /* ---------- plan ------------------------------------------------------------ */
 
-.plan-hero { border-left: 3px solid var(--jade); }
+.plan-hero { position: relative; }
 .plan-pool {
   margin: 4px 0 0;
   font-size: 30px;
@@ -493,7 +493,27 @@ body.no-scroll { overflow: hidden; }
 .acc-grid.sorting .acc-card { transition: transform .16s ease; }
 
 .acc-detail-head { text-align: center; padding-bottom: 6px; }
-.net-card { border-left: 3px solid var(--jade); }
+.net-card { position: relative; }
+
+/* Headline accent. It used to be `border-left: 3px solid var(--jade)`, which
+   follows the corner radius — fine in light mode where the other three borders
+   are visible and it reads as an accent on a complete outline, but in dark mode
+   those borders disappear against the page and all that is left is a green
+   hook curling off into space. A bar inset clear of the corners reads as
+   deliberate in both themes, and because it is an element rather than a border
+   it survives the frosted and neumorphism styles untouched. */
+.net-card::before,
+.plan-hero::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 18px;
+  bottom: 18px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--jade);
+  pointer-events: none;
+}
 .net-worth {
   margin: 4px 0 0;
   font-size: 30px;
@@ -1063,10 +1083,6 @@ body.no-scroll { overflow: hidden; }
   border-color: rgba(255, 255, 255, .12);
   box-shadow: 0 8px 24px rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255, 255, 255, .07);
 }
-/* The jade spine on the two headline cards would fight the glass edge. */
-:root[data-card-style="frosted"] .net-card,
-:root[data-card-style="frosted"] .plan-hero { border-left-width: 1.5px; }
-
 /* ---------- neumorphism ---------- */
 :root[data-card-style="neumorphism"] .hero,
 :root[data-card-style="neumorphism"] .bal-general,
@@ -1148,13 +1164,4 @@ body.no-scroll { overflow: hidden; }
 :root[data-theme="dark"][data-card-style="neumorphism"] .card,
 :root[data-theme="dark"][data-card-style="neumorphism"] .acc-card {
   box-shadow: 6px 6px 14px rgba(0, 0, 0, .55), -6px -6px 14px rgba(255, 255, 255, .05);
-}
-/* border:none above would drop the jade spine, so put it back as a shadow. */
-:root[data-card-style="neumorphism"] .net-card,
-:root[data-card-style="neumorphism"] .plan-hero {
-  box-shadow: inset 3px 0 0 var(--jade), 6px 6px 14px rgba(0, 0, 0, .10), -6px -6px 14px rgba(255, 255, 255, .85);
-}
-:root[data-theme="dark"][data-card-style="neumorphism"] .net-card,
-:root[data-theme="dark"][data-card-style="neumorphism"] .plan-hero {
-  box-shadow: inset 3px 0 0 var(--jade), 6px 6px 14px rgba(0, 0, 0, .55), -6px -6px 14px rgba(255, 255, 255, .05);
 }
