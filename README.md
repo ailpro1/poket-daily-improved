@@ -265,12 +265,11 @@ the in-memory state. There is also a human-readable CSV export of the Plan.
 - **Help lives behind the `?`** in the header, one entry per tab in `App.HELP`,
   so the cards themselves stay short. Anything explaining *how a number works*
   belongs there; only figures and one-line facts stay on a card.
-- **The headline accent** on `.net-card` and `.plan-hero` is an inset bar
-  (`::before`), not a coloured left border. As a border it followed the corner
-  radius, which reads fine in light mode against a visible outline but leaves a
-  green hook curling into space in dark mode, where the other three borders
-  disappear into the page. As an element it also survives the card styles
-  untouched, instead of needing a per-style patch.
+- **The headline cards are plain boxes.** `.net-card` and `.plan-hero` used to
+  carry a jade edge — first `border-left`, then an inset `::before` bar — but a
+  coloured edge fights whatever card style is active, and the big figure inside
+  already marks the card as a headline. Both classes remain as markup hooks
+  with no accent styling; don't reintroduce one.
 - **Card style** (`[data-card-style]` on `<html>`) covers `.card` and
   `.acc-card` on every tab, not just Home's three headline cards. The
   neutral variants are built from theme tokens rather than fixed colours. The
