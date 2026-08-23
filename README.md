@@ -175,6 +175,7 @@ Development-only; nothing in `tools/` ships or is referenced by the app.
 ```bash
 node tools/selfcheck.js     # the spec's 7-step scenario against calc.js directly
 node tools/selfcheck-midcycle.js  # the mid-cycle-start rule, in isolation
+node tools/selfcheck-cycles.js    # cycle date maths for every start day, 1-31
 node tools/check-cache.js   # every asset is in the service worker precache
 node tools/release.js --check      # sw.js CACHE was bumped for the assets that changed
 node tools/smoke.js         # boots the app in jsdom, reads numbers back off the DOM
@@ -209,7 +210,11 @@ the in-memory state. There is also a human-readable CSV export of the Plan.
 
 - **Cycle key** is the `YYYY-MM` of the cycle's *start* month. With a cycle start
   day of 25, `2026-01` means 25 Jan → 24 Feb 2026.
-- **Cycle start day** is capped at 28 so every month has one.
+- **Cycle start day** is 1-31. A month too short for the chosen day starts on
+  its last day instead (`clampDay`), so a payday on the 30th starts February on
+  the 28th — or the 29th in a leap year — exactly as a bank would pay you early.
+  Cycles stay contiguous with no gap or overlap at the seam;
+  `tools/selfcheck-cycles.js` asserts that for every start day across six years.
 - **Dates** are handled at local noon internally, so daylight saving never shifts
   a day; they are stored as `YYYY-MM-DD` strings.
 - **Bottom nav** defaults to Home, Log, Plan, Accounts, Breakdown, and is

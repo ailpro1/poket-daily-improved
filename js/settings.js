@@ -165,8 +165,9 @@
         var cur = el('input', { class: 'input', type: 'text', value: root.S.settings.currency, maxlength: '4' });
         body.appendChild(UI.field('Currency symbol', cur));
 
-        var startDay = el('input', { class: 'input', type: 'number', min: '1', max: '28', value: root.S.settings.cycleStartDay });
-        body.appendChild(UI.field('Cycle starts on day', startDay, 'Set 25 if your month runs the 25th to the 24th.'));
+        var startDay = el('input', { class: 'input', type: 'number', min: '1', max: '31', value: root.S.settings.cycleStartDay });
+        body.appendChild(UI.field('Cycle starts on day', startDay,
+          'Set 25 if your month runs the 25th to the 24th. Pick 29, 30 or 31 and short months use their last day instead.'));
 
         var mid = midCycleSection(body);
 
@@ -187,7 +188,7 @@
           el('button', {
             class: 'btn btn-primary', text: 'Save settings',
             onclick: function () {
-              var day = Math.min(28, Math.max(1, parseInt(startDay.value, 10) || 1));
+              var day = Math.min(31, Math.max(1, parseInt(startDay.value, 10) || 1));
               var dayMoved = day !== root.S.settings.cycleStartDay;
               var patch = {
                 currency: cur.value.trim() || 'RM',

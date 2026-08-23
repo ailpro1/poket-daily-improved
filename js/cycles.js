@@ -5,9 +5,14 @@
 (function (root) {
   'use strict';
 
+  /* 1-31. A day that a given month does not have falls back to that month's
+     last day via clampDay(), which is what a bank does with a payday on the
+     30th: February pays on the 28th (29th in a leap year). Cycles stay
+     contiguous either way — tools/selfcheck-cycles.js proves it for every
+     start day. */
   function startDay() {
     var s = root.S && root.S.settings ? root.S.settings.cycleStartDay : 1;
-    return Math.min(28, Math.max(1, parseInt(s, 10) || 1));
+    return Math.min(31, Math.max(1, parseInt(s, 10) || 1));
   }
 
   /* Dates are handled at local noon so DST never shifts a day. */
