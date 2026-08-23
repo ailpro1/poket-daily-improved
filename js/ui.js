@@ -166,15 +166,21 @@
         render: function (body) {
           body.appendChild(el('p', { class: 'sheet-note', text: opts.message || '' }));
           body.appendChild(el('div', { class: 'row-actions' }, [
-            el('button', { class: 'btn btn-ghost', text: opts.cancelLabel || 'Cancel', onclick: function () { s.close(); resolve(false); } }),
+            el('button', { class: 'btn btn-ghost', text: opts.cancelLabel || 'Cancel', onclick: function () { s.close(false); } }),
             el('button', {
               class: 'btn ' + (opts.danger ? 'btn-danger' : 'btn-primary'),
               text: opts.confirmLabel || 'Confirm',
-              onclick: function () { s.close(); resolve(true); }
+              onclick: function () { s.close(true); }
             })
           ]));
         },
-        onClose: function () { resolve(false); }
+        /* The one resolution path. close() calls onClose synchronously, so a
+           button that did `s.close(); resolve(true)` settled the promise as
+           false on the close() line and threw its own answer away — every
+           confirm-gated action silently did nothing. Route the answer THROUGH
+           close() instead: the buttons, the ×, the scrim and Escape all land
+           here, and only close(true) means yes. */
+        onClose: function (result) { resolve(result === true); }
       });
     });
   }

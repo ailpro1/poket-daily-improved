@@ -157,6 +157,42 @@ w.addEventListener('error', e => errors.push(e.message));
       w.Cycles.getCycleRangeForKey(w.Cycles.currentCycleKey()).totalDays) < 0.01,
     w.Calc.dailyAllowance(w.Cycles.currentCycleKey()));
 
+  // UI.confirm and the actions gated on it. Every other test in here drives
+  // Actions.* directly, which is exactly how a confirm that could only ever
+  // resolve false shipped: Delete, Skip setup and Restore all silently did
+  // nothing. Drive the real dialog.
+  let answer = null;
+  w.UI.confirm({ title: 'Sure?', message: 'M', confirmLabel: 'Do it' }).then(v => { answer = v; });
+  await wait();
+  check('confirm opens a dialog', /Sure\?/.test(sheet().textContent));
+  byText('.btn', 'Do it').click(); await wait(300);
+  check('confirming resolves true', answer === true, answer);
+  w.UI.confirm({ title: 'Sure?', message: 'M', confirmLabel: 'Do it' }).then(v => { answer = v; });
+  await wait();
+  byText('.btn', 'Cancel').click(); await wait(300);
+  check('cancelling resolves false', answer === false, answer);
+  w.UI.confirm({ title: 'Sure?', message: 'M', confirmLabel: 'Do it' }).then(v => { answer = v; });
+  await wait();
+  q('.sheet-head .icon-btn').click(); await wait(300);
+  check('closing with the x resolves false', answer === false, answer);
+
+  // and end to end: a Plan item really leaves the Plan tab and the database
+  await w.Actions.savePlanItem('commitments', {
+    id: 'p_del', name: 'Sewa Rumah', amount: 1200, accountId: w.S.accounts[0].id,
+    dueType: 'day', dueDay: 1, cycleOverrides: {}
+  });
+  w.App.go('plan'); await wait();
+  const planRow = [...D.querySelectorAll('.plan-row')].filter(r => /Sewa Rumah/.test(r.textContent))[0];
+  check('the plan row is on the tab', !!planRow);
+  planRow.click(); await wait();
+  byText('.btn', 'Delete').click(); await wait();
+  check('delete asks first', /Delete Sewa Rumah\?/.test(sheet().textContent));
+  byText('.btn', 'Delete').click(); await wait(400);
+  check('plan item deleted from state', !w.Calc.planItems('commitments').some(i => i.id === 'p_del'));
+  check('plan item deleted from IndexedDB', (await w.DB.all('plan')).every(r => r.id !== 'p_del'));
+  check('and the row left the Plan tab',
+    ![...D.querySelectorAll('.plan-row')].some(r => /Sewa Rumah/.test(r.textContent)));
+
   // the once-only prompt for installs that were already mid-cycle at first boot
   const curRange = w.Cycles.getCycleRangeForKey(w.Cycles.currentCycleKey());
   const prevRange = w.Cycles.getCycleRangeForKey(w.Cycles.shiftCycleKey(w.Cycles.currentCycleKey(), -1));
