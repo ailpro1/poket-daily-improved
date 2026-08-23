@@ -22,17 +22,13 @@
     var summary = Calc.cycleSummary(cycleKey);
     host.innerHTML = '';
 
+    /* Cycle in-and-out only. The live account balances belong on Accounts,
+       next to the cards they are the sum of. */
     host.appendChild(el('section', { class: 'card totals' }, [
       el('div', { class: 'totals-row' }, [
         stat('In this cycle', summary.actualIncome, 'pos'),
         stat('Out this cycle', summary.actualSpent, 'neg')
-      ]),
-      el('div', { class: 'kv-split' }),
-      el('div', { class: 'totals-row' }, [
-        stat('Monthly Balance', Calc.monthlyBalance(), ''),
-        stat('Savings Balance', Calc.savingsBalance(), '')
-      ]),
-      el('p', { class: 'card-note', text: 'Balances are live account totals, not this cycle\'s in-and-out.' })
+      ])
     ]));
 
     var bar = el('div', { class: 'filter-bar' });

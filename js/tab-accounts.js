@@ -153,7 +153,12 @@
 
   function render(host) {
     host.innerHTML = '';
-    host.appendChild(el('section', { class: 'card totals' }, [
+    /* Net worth leads, with the two groups it is made of underneath — all
+       three are live sums of the cards below, so they always reconcile. */
+    host.appendChild(el('section', { class: 'card totals net-card' }, [
+      el('span', { class: 'eyebrow', text: 'Net Worth · actual' }),
+      el('p', { class: 'num net-worth', text: Fmt.money(Calc.netWorth()) }),
+      el('div', { class: 'kv-split' }),
       el('div', { class: 'totals-row' }, [
         el('div', { class: 'stat' }, [
           el('span', { class: 'eyebrow', text: 'Monthly Balance' }),
@@ -164,7 +169,7 @@
           el('b', { class: 'num stat-value', text: Fmt.money(Calc.savingsBalance()) })
         ])
       ]),
-      el('p', { class: 'card-note', text: 'Each figure is the live sum of the cards below it. Hold a card to drag it into a new order.' })
+      el('p', { class: 'card-note', text: 'Spending and saving accounts added together. Each figure is the live sum of the cards below it. Hold a card to drag it into a new order.' })
     ]));
 
     group('general', 'Accounts', host);

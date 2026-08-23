@@ -35,7 +35,8 @@ const eq = (label, a, b) => check(label, Math.abs(a - b) < 0.02, 'got=' + a + ' 
 
 (async () => {
   await w.App.boot();
-  await wait(120);
+  /* Splash.ART_HOLD holds the artwork for 3s before the greeting paints. */
+  await wait(3400);
   const { Calc, Actions, Fmt, Cycles, S } = w;
 
   check('app booted, daily splash waiting', !!w.document.querySelector('#splash.ready'));
@@ -43,7 +44,8 @@ const eq = (label, a, b) => check(label, Math.abs(a - b) < 0.02, 'got=' + a + ' 
   await wait(400);
   check('splash clears to the app', !w.document.querySelector('#splash'));
   check('nav rendered in configured order',
-    [...w.document.querySelectorAll('.nav-label')].map(n => n.textContent).join(',') === 'Home,Log,Plan,Accounts,Breakdown');
+    [...w.document.querySelectorAll('.nav-label')].map(n => n.textContent).join(',') === 'Home,Transaction,Plan,Accounts,Breakdown',
+    [...w.document.querySelectorAll('.nav-label')].map(n => n.textContent).join(','));
 
   await Actions.saveSettings({ onboarded: true, cycleStartDay: 1 });
   const cycle = w.App.cycleKey();
@@ -101,6 +103,12 @@ const eq = (label, a, b) => check(label, Math.abs(a - b) < 0.02, 'got=' + a + ' 
   const savCards = [...groups[1].querySelectorAll('.acc-bal')].map(n => money(n.textContent));
   eq('sum of spending cards === Monthly Balance', genCards.reduce((a, b) => a + b, 0), Calc.monthlyBalance());
   eq('sum of saving cards === Savings Balance', savCards.reduce((a, b) => a + b, 0), Calc.savingsBalance());
+  eq('Net Worth card === both balances added up', money(txt('.net-worth')),
+    Calc.monthlyBalance() + Calc.savingsBalance());
+  eq('and Calc.netWorth agrees with the card', Calc.netWorth(), money(txt('.net-worth')));
+  check('Net Worth leads the Accounts tab',
+    w.document.querySelector('#app-main .card .eyebrow').textContent === 'Net Worth · actual',
+    txt('#app-main .card .eyebrow'));
   check('section titles carry a count',
     groups[0].querySelector('.eyebrow').textContent === 'Accounts (2)' &&
     groups[1].querySelector('.eyebrow').textContent === 'Saving Accounts (1)',
@@ -112,15 +120,47 @@ const eq = (label, a, b) => check(label, Math.abs(a - b) < 0.02, 'got=' + a + ' 
   const cs = Calc.cycleSummary(cycle);
   eq('Log tab: in this cycle', stats[0], cs.actualIncome);
   eq('Log tab: out this cycle', stats[1], cs.actualSpent);
-  eq('Log tab: Monthly Balance matches Home', stats[2], homeCards[0]);
-  eq('Log tab: Savings Balance matches Home', stats[3], homeCards[1]);
+  check('Log tab shows the cycle in-and-out only, no live balances',
+    stats.length === 2 && !/Monthly Balance|Savings Balance/.test(txt('#app-main')),
+    stats.length + ' stats');
   check('transfers are listed as a pair', S.logs.filter(l => l.transferPairId).length === 4);
 
   w.App.go('breakdown');
   await wait(60);
+  check('breakdown offers spendable / committed / money in',
+    [...w.document.querySelectorAll('.seg')].map(n => n.textContent).join(',') === 'Spendable,Committed,Money in',
+    [...w.document.querySelectorAll('.seg')].map(n => n.textContent).join(','));
   const catRows = [...w.document.querySelectorAll('.cat-row .num')].map(n => money(n.textContent));
-  eq('breakdown rows foot to budget-affecting spend',
+  eq('spendable rows foot to budget-affecting spend',
     catRows.reduce((a, b) => a + b, 0), Calc.budgetDrainInRange(range.startIso, range.endIso));
+
+  /* The committed half — the money the daily budget already subtracted, which
+     is exactly why none of it appears above. */
+  [...w.document.querySelectorAll('.seg')].filter(b => b.textContent === 'Committed')[0].click();
+  await wait(60);
+  const planRows = [...w.document.querySelectorAll('.cat-row .num')].map(n => money(n.textContent));
+  const pb = Calc.planBreakdown(cycle);
+  eq('committed rows foot to commitments + savings', planRows.reduce((a, b) => a + b, 0),
+    cs.plannedCommitments + cs.plannedSavings);
+  eq('and planBreakdown agrees', pb.total, cs.plannedCommitments + cs.plannedSavings);
+  eq('ticked off + still to pay === the whole committed total', pb.paid + pb.unpaid, pb.total);
+  eq('both items are ticked off in this scenario', pb.paid, 1200 + 800);
+  check('committed excludes planned income',
+    !pb.items.some(i => i.section === 'income') && !/Salary/.test(txt('#app-main')));
+  check('each committed row says which half it came from and whether it is paid',
+    /Commitment · \d+% · ticked off/.test(txt('#app-main')) &&
+    /Savings · \d+% · ticked off/.test(txt('#app-main')));
+
+  /* Untick one and the paid/unpaid split must move with it. */
+  await Actions.setChecked(cycle, 'commitments', S.plan.commitments[0], false);
+  await wait(60);
+  const pb2 = Calc.planBreakdown(cycle);
+  eq('unticking moves money from paid to unpaid', pb2.unpaid, 1200);
+  eq('but the committed total is unchanged', pb2.total, pb.total);
+  await Actions.setChecked(cycle, 'commitments', S.plan.commitments[0], true);
+  await wait(60);
+  [...w.document.querySelectorAll('.seg')].filter(b => b.textContent === 'Spendable')[0].click();
+  await wait(60);
 
   w.App.go('plan');
   await wait(60);

@@ -72,6 +72,10 @@
   function monthlyBalance(uptoIso) { return sumAccounts('general', uptoIso); }
   function savingsBalance(uptoIso) { return sumAccounts('saving', uptoIso); }
 
+  /* Everything you own across both groups. Same live-sum rule, so it always
+     equals the two balances added up. */
+  function netWorth(uptoIso) { return R(monthlyBalance(uptoIso) + savingsBalance(uptoIso)); }
+
   /* ---------- plan (spec 4) --------------------------------------------- */
 
   function planSections() { return ['income', 'commitments', 'savings']; }
@@ -157,19 +161,57 @@
     return R(cyclePool(cycleKey) / r.totalDays);
   }
 
-  /* Plan money for this cycle that has not been ticked off the checklist.
-     Repeats a predicate that also lives in Actions.checklistLogFor, but calc
-     must not depend on actions — the dependency runs the other way. */
-  function planOutstanding(section, cycleKey) {
+  /* The log a ticked-off plan item wrote, if it has been ticked this cycle.
+     Mirrors Actions.checklistLogFor, but calc must not depend on actions —
+     the dependency runs the other way. */
+  function planItemLog(cycleKey, itemId) {
     var logs = S().logs;
+    for (var i = 0; i < logs.length; i++) {
+      if (logs[i].sourceChecklistId === itemId && logs[i].sourceCycle === cycleKey) return logs[i];
+    }
+    return null;
+  }
+
+  /* Plan money for this cycle that has not been ticked off the checklist. */
+  function planOutstanding(section, cycleKey) {
     return R(planItems(section).reduce(function (t, it) {
       var amt = planAmount(it, cycleKey);
-      if (!amt) return t;
-      for (var i = 0; i < logs.length; i++) {
-        if (logs[i].sourceChecklistId === it.id && logs[i].sourceCycle === cycleKey) return t;
-      }
+      if (!amt || planItemLog(cycleKey, it.id)) return t;
       return t + amt;
     }, 0));
+  }
+
+  /* ---------- committed money, per plan item -----------------------------
+     The complement of categoryTotals(): that shows discretionary spending,
+     which deliberately excludes anything ticked off the Plan, so on its own
+     it can never account for a whole cycle. This is the other half —
+     commitments and savings, per item, with what has actually been paid.
+     Income is left out: it is money arriving, not money going somewhere. */
+  function planBreakdown(cycleKey) {
+    var items = [], total = 0, paid = 0;
+    ['commitments', 'savings'].forEach(function (sec) {
+      planItems(sec).forEach(function (it) {
+        var amt = planAmount(it, cycleKey);   /* 0 when inactive this cycle */
+        if (!amt) return;
+        var log = planItemLog(cycleKey, it.id);
+        items.push({
+          id: it.id, name: it.name, section: sec, amount: amt,
+          paid: !!log, accountId: it.accountId
+        });
+        total += amt;
+        if (log) paid += amt;
+      });
+    });
+    items.forEach(function (i) { i.share = total ? i.amount / total : 0; });
+    items.sort(function (a, b) { return b.amount - a.amount; });
+    return {
+      total: R(total),
+      paid: R(paid),
+      unpaid: R(total - paid),
+      items: items,
+      commitments: planTotal('commitments', cycleKey),
+      savings: planTotal('savings', cycleKey)
+    };
   }
 
   /* Best guess at "spending money I have left" for the mid-cycle question.
@@ -426,6 +468,7 @@
     accountBalance: accountBalance,
     monthlyBalance: monthlyBalance,
     savingsBalance: savingsBalance,
+    netWorth: netWorth,
     planSections: planSections,
     planItems: planItems,
     findPlanItem: findPlanItem,
@@ -441,6 +484,8 @@
     firstActivityIso: firstActivityIso,
     midCycle: midCycle,
     planOutstanding: planOutstanding,
+    planItemLog: planItemLog,
+    planBreakdown: planBreakdown,
     suggestMidCycleRemaining: suggestMidCycleRemaining,
     carryInto: carryInto,
     dailyBudget: dailyBudget,
