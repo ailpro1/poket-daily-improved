@@ -1,7 +1,13 @@
 /* sw.js — offline shell.
    ASSETS must list every file the app loads. tools/check-cache.js verifies
-   this list against index.html and the js/ + css/ folders. */
-var CACHE = 'poket-daily-v3';
+   this list against index.html and the js/ + css/ folders.
+
+   BUMP CACHE ON EVERY RELEASE. Non-navigation requests are served cache
+   first, so a returning user keeps getting the old js/ and css/ out of the
+   old cache until the name changes. Changing it is also what the page
+   watches for: a new sw.js installs, skipWaiting() puts it in charge, and
+   App.watchForUpdate() shows "App is updating" and reloads once. */
+var CACHE = 'poket-daily-v5';
 
 var ASSETS = [
   './',
@@ -41,6 +47,11 @@ self.addEventListener('install', function (e) {
       .then(function (c) { return c.addAll(ASSETS); })
       .then(function () { return self.skipWaiting(); })
   );
+});
+
+/* The page asks for this if it ever finds a worker stuck in 'installed'. */
+self.addEventListener('message', function (e) {
+  if (e.data === 'skip-waiting') self.skipWaiting();
 });
 
 self.addEventListener('activate', function (e) {

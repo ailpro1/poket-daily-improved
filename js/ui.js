@@ -52,7 +52,10 @@
       setTimeout(function () {
         wrap.remove();
         openSheets = openSheets.filter(function (s) { return s !== api; });
-        if (!openSheets.length) document.body.classList.remove('no-scroll');
+        if (!openSheets.length) {
+          document.body.classList.remove('no-scroll');
+          flushIdle();
+        }
       }, 220);
       if (opts.onClose) opts.onClose(result);
     }
@@ -66,6 +69,23 @@
   }
 
   function closeTopSheet() { if (openSheets.length) openSheets[openSheets.length - 1].close(); }
+
+  /* Is the user in the middle of something? Used by anything that must not
+     interrupt a half-filled form — a reload for a new app version, say. */
+  function busy() { return openSheets.length > 0; }
+
+  var idleWaiters = [];
+
+  function onIdle(fn) {
+    if (!busy()) { fn(); return; }
+    idleWaiters.push(fn);
+  }
+
+  function flushIdle() {
+    var fns = idleWaiters;
+    idleWaiters = [];
+    fns.forEach(function (f) { f(); });
+  }
 
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') closeTopSheet();
@@ -105,6 +125,40 @@
     }, 1000);
   }
 
+  /* ---------- update bar -------------------------------------------------
+     A persistent strip along the bottom while a new version installs. Not a
+     toast: toast() wipes its whole host on every call, and this has to
+     outlive whatever else the app happens to be saying. Borrows the toast's
+     looks, positions itself, and sits above the splash — a first-open update
+     lands while the artwork is still holding the screen.
+     Call updateBar(false) to take it away. */
+  var updateNode = null;
+
+  function updateBar(message, opts) {
+    opts = opts || {};
+    if (message === false) {
+      if (!updateNode) return null;
+      var going = updateNode;
+      updateNode = null;
+      going.classList.remove('in');
+      setTimeout(function () { if (going.parentNode) going.remove(); }, 220);
+      return null;
+    }
+    if (!updateNode) {
+      updateNode = el('div', { class: 'toast update-bar', role: 'status', 'aria-live': 'polite' });
+      document.body.appendChild(updateNode);
+      requestAnimationFrame(function () { updateNode.classList.add('in'); });
+    }
+    updateNode.innerHTML = '';
+    updateNode.appendChild(el('span', { class: 'toast-msg', text: message }));
+    if (opts.actionLabel) {
+      updateNode.appendChild(el('button', {
+        class: 'toast-action', text: opts.actionLabel, onclick: opts.onAction
+      }));
+    }
+    return updateNode;
+  }
+
   function confirmDialog(opts) {
     return new Promise(function (resolve) {
       var s = sheet({
@@ -112,15 +166,21 @@
         render: function (body) {
           body.appendChild(el('p', { class: 'sheet-note', text: opts.message || '' }));
           body.appendChild(el('div', { class: 'row-actions' }, [
-            el('button', { class: 'btn btn-ghost', text: opts.cancelLabel || 'Cancel', onclick: function () { s.close(); resolve(false); } }),
+            el('button', { class: 'btn btn-ghost', text: opts.cancelLabel || 'Cancel', onclick: function () { s.close(false); } }),
             el('button', {
               class: 'btn ' + (opts.danger ? 'btn-danger' : 'btn-primary'),
               text: opts.confirmLabel || 'Confirm',
-              onclick: function () { s.close(); resolve(true); }
+              onclick: function () { s.close(true); }
             })
           ]));
         },
-        onClose: function () { resolve(false); }
+        /* The one resolution path. close() calls onClose synchronously, so a
+           button that did `s.close(); resolve(true)` settled the promise as
+           false on the close() line and threw its own answer away — every
+           confirm-gated action silently did nothing. Route the answer THROUGH
+           close() instead: the buttons, the ×, the scrim and Escape all land
+           here, and only close(true) means yes. */
+        onClose: function (result) { resolve(result === true); }
       });
     });
   }
@@ -174,6 +234,7 @@
   root.UI = {
     $: $, $$: $$, el: el, esc: esc, buzz: buzz,
     sheet: sheet, toast: toast, confirm: confirmDialog,
+    updateBar: updateBar, busy: busy, onIdle: onIdle,
     field: field, select: select, segmented: segmented, emptyState: emptyState
   };
 })(typeof self !== 'undefined' ? self : globalThis);

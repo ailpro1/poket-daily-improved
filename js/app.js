@@ -184,6 +184,82 @@
     return loadState().then(function () { applyTheme(); refresh(); });
   }
 
+  /* ---------- picking up a new version -----------------------------------
+     sw.js calls skipWaiting() on install and clients.claim() on activate, so
+     a bumped CACHE constant installs and takes charge on its own. What was
+     missing was the page: it keeps running the JS it parsed at boot until it
+     reloads, so a user could sit on the old build indefinitely. So: say what
+     is happening, then reload once the new worker is actually in charge.
+
+     The dwell matters: on a fast connection the whole install takes a few
+     milliseconds, so without it the message flashes past unread and the app
+     looks like it reloaded for no reason. */
+  var UPDATE_NOTICE_MS = 1400;
+  var UPDATE_NOTICE = 'App is updating. Please wait…';
+
+  function watchForUpdate(reg) {
+    if (!reg) return;
+    /* No controller means this is the first ever install rather than an
+       update — the page already loaded these exact files from the network,
+       so there is nothing to announce and nothing to reload for. */
+    var replacing = !!navigator.serviceWorker.controller;
+    var reloading = false;
+    var noticeAt = 0;
+
+    function go() { window.location.reload(); }
+
+    function reload() {
+      if (reloading) return;
+      reloading = true;
+      /* Never yank a half-filled form away. */
+      if (UI.busy()) {
+        UI.updateBar('Update ready. It will load when you finish here.',
+          { actionLabel: 'Reload now', onAction: go });
+        UI.onIdle(go);
+        return;
+      }
+      /* Leave the notice exactly as it is — the reload IS the confirmation,
+         and swapping the text now would replace the message the user is
+         still reading. Just make sure it was up long enough to read. */
+      notice();
+      setTimeout(function () { UI.onIdle(go); },
+        Math.max(0, UPDATE_NOTICE_MS - (Date.now() - noticeAt)));
+    }
+
+    function notice() {
+      if (!noticeAt) noticeAt = Date.now();
+      UI.updateBar(UPDATE_NOTICE);
+    }
+
+    function announce(worker) {
+      if (!worker || !replacing) return;
+      notice();
+      /* A waiting worker means skipWaiting() has not taken hold; ask again. */
+      if (worker.state === 'installed') worker.postMessage('skip-waiting');
+      worker.addEventListener('statechange', function () {
+        if (reloading) return;
+        if (worker.state === 'installed') worker.postMessage('skip-waiting');
+        /* redundant = the install failed, so stop promising an update */
+        if (worker.state === 'redundant') UI.updateBar(false);
+      });
+    }
+
+    announce(reg.installing || reg.waiting);
+    reg.addEventListener('updatefound', function () { announce(reg.installing); });
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (!replacing) return;
+      /* On a fast connection the worker can install, activate and claim the
+         page before register() even resolves, so this is often where the
+         notice first goes up rather than in announce(). */
+      notice();
+      reload();
+    });
+
+    /* register() only checks for a new sw.js on navigation, and a phone can
+       keep a PWA alive for days. Ask on every open. */
+    if (reg.update) reg.update().catch(function () { /* offline: nothing to check */ });
+  }
+
   var booted = false;
 
   function boot() {
@@ -204,7 +280,9 @@
         }
       });
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').catch(function () { /* offline still works from cache */ });
+        navigator.serviceWorker.register('sw.js')
+          .then(watchForUpdate)
+          .catch(function () { /* offline still works from cache */ });
       }
     }).catch(function (err) {
       if (typeof console !== 'undefined') console.error('Poket Daily boot failed', err);
@@ -215,6 +293,7 @@
 
   root.App = {
     boot: boot, refresh: refresh, go: go, reload: reload,
+    watchForUpdate: watchForUpdate,
     cycleKey: cycleKey, setCycle: setCycle, applyTheme: applyTheme,
     applyCardStyle: applyCardStyle,
     TABS: TABS, DEFAULT_NAV: DEFAULT_NAV, CARD_STYLES: CARD_STYLES
