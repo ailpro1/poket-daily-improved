@@ -29,17 +29,33 @@ There are two deliberately different kinds of number:
 
 | | Question it answers | How it is built |
 |---|---|---|
-| **Monthly Balance** / **Savings Balance** | "What do I actually have?" | Live sum of `accountBalance()` across general / saving accounts |
+| **Monthly Balance** / **Savings Balance** / **Net Worth** | "What do I actually have?" | Live sum of `accountBalance()` across general / saving / both |
 | **Daily Spending Budget** | "What can I safely spend today?" | `(planned income − commitments − savings) ÷ days`, adjusted for real activity and carry-over |
 
 ### The double-counting rule
 
 The daily budget pool already subtracts planned commitments and savings. So the
 transactions created by ticking the Checklist (`sourceChecklistId` set) are
-**excluded** from the daily budget and the Breakdown tab. They are still real
-money and still move account balances, and they still appear in the Log tab's
-"out this cycle" total. `Calc.affectsBudget()` is the single predicate for this;
-everything that needs the rule calls it.
+**excluded** from the daily budget and from the Breakdown tab's *Spendable* view.
+They are still real money and still move account balances, and they still appear
+in the Transaction tab's "out this cycle" total. `Calc.affectsBudget()` is the
+single predicate for this; everything that needs the rule calls it.
+
+### The two halves of Breakdown
+
+Because of that rule, discretionary spending can never account for a whole
+cycle on its own, so the Breakdown tab shows both sides of the line:
+
+| View | What it totals | Built from |
+|---|---|---|
+| **Spendable** | day-to-day spending by category | `Calc.categoryTotals(from, to, 'expense')` |
+| **Committed** | Plan commitments and savings, per item, with what has been ticked off | `Calc.planBreakdown(cycleKey)` |
+| **Money in** | income you logged yourself, by category | `Calc.categoryTotals(from, to, 'income')` |
+
+The two halves are disjoint by construction — the same predicate that keeps a
+ticked-off item out of Spendable is what puts it in Committed — so nothing is
+counted twice and nothing falls between them. Planned **income** is deliberately
+absent from Committed: it is money arriving, not money going somewhere.
 
 ### Starting part-way through a cycle
 
@@ -100,7 +116,7 @@ js/ui.js                sheets, toasts, undo snackbar, form primitives
 js/charts.js            hand-rolled SVG line, doughnut and day-strip charts
 js/forms.js             transaction, transfer, account and plan-item sheets
 js/checklist.js         per-cycle checklist drawer
-js/tab-*.js             Home, Log, Plan, Accounts, Breakdown
+js/tab-*.js             Home, Transaction (tab-log), Plan, Accounts, Breakdown
 js/onboarding.js        first-run guide (cycle, accounts, mid-cycle, plan)
 js/settings.js          preferences, JSON backup/restore, plan CSV
 js/app.js               state load, routing, header, nav, theme, SW registration

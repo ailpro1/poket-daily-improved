@@ -492,6 +492,15 @@ body.no-scroll { overflow: hidden; }
 .acc-grid.sorting .acc-card { transition: transform .16s ease; }
 
 .acc-detail-head { text-align: center; padding-bottom: 6px; }
+.net-card { border-left: 3px solid var(--jade); }
+.net-worth {
+  margin: 4px 0 0;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -.03em;
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
 .acc-detail-bal { margin: 4px 0 0; font-family: var(--mono); font-size: 30px; font-weight: 700; letter-spacing: -.03em; }
 .month-nav { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 12px 0 4px; }
 .month-label { font-size: 12px; font-weight: 700; letter-spacing: .04em; color: var(--muted); }

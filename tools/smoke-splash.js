@@ -23,8 +23,10 @@ function makeWindow() {
 }
 
 (async () => {
+  /* Every boot waits out Splash.ART_HOLD (3s), or the greeting and the figure
+     have not painted yet and the splash never marks itself as seen. */
   const w1 = makeWindow();
-  await w1.App.boot(); await wait(300);
+  await w1.App.boot(); await wait(3400);
   const hours = { 3: 'Still up?', 9: 'Good morning!', 14: 'Good afternoon!', 20: 'Good evening!', 23: 'Good night!' };
   Object.keys(hours).forEach(h => check('hour ' + h + ' greets correctly', w1.Splash.greeting(+h).text === hours[h], w1.Splash.greeting(+h).text));
 
@@ -34,7 +36,7 @@ function makeWindow() {
   await w1.Actions.savePlanItem('income', { id: 'i1', name: 'Gaji', amount: 3100, accountId: 'a1', dueType: 'day', dueDay: 1, cycleOverrides: {} });
 
   const w2 = makeWindow();
-  await w2.App.boot(); await wait(300);
+  await w2.App.boot(); await wait(3400);
   const shown = w2.document.querySelector('#splash');
   const expected = w2.Fmt.group(Math.abs(w2.Calc.dailyBudget().left));
   check('splash shows today\'s budget figure', shown.querySelector('.splash-num').textContent === expected,
@@ -44,12 +46,12 @@ function makeWindow() {
   await wait(400);
 
   const w3 = makeWindow();
-  await w3.App.boot(); await wait(300);
+  await w3.App.boot(); await wait(3400);
   check('second open the same day skips the splash', !w3.document.querySelector('#splash'));
 
   await w3.Actions.saveSettings({ lastSplashDate: '2020-01-01' });
   const w4 = makeWindow();
-  await w4.App.boot(); await wait(300);
+  await w4.App.boot(); await wait(3400);
   check('a new day brings the splash back', !!w4.document.querySelector('#splash.ready'));
 
   console.log(fails ? '\n' + fails + ' FAILING' : '\nSplash behaves.');
