@@ -27,7 +27,8 @@
     var anything = false;
 
     sections.forEach(function (sec) {
-      var items = Calc.planItems(sec.key).filter(function (it) { return Calc.isActiveInCycle(it, cycleKey); });
+      /* Same order as the Plan tab — this drawer opens from it. */
+      var items = Calc.planItemsSorted(sec.key, cycleKey).filter(function (it) { return Calc.isActiveInCycle(it, cycleKey); });
       if (!items.length) return;
       anything = true;
       var done = items.filter(function (it) { return root.Actions.isChecked(cycleKey, it.id); }).length;

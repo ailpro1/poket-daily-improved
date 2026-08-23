@@ -107,6 +107,24 @@
     return R(Math.abs(v || 0));
   }
 
+  /* Display order for plan lists: biggest first, so what moves the pool most
+     is at the top. Sorts on the CYCLE's amount, so a per-cycle override
+     reorders with it and an item that has ended (0 this cycle) falls to the
+     bottom. Ties break on the permanent amount, then name, so the order never
+     jitters between renders.
+
+     Deliberately NOT folded into planItems(): that is on carryInto()'s
+     day-by-day walk via planTotal(), and must not sort 1500 times over. */
+  function planItemsSorted(section, cycleKey) {
+    return planItems(section).slice().sort(function (a, b) {
+      var d = planAmount(b, cycleKey) - planAmount(a, cycleKey);
+      if (d) return d;
+      d = Math.abs(b.amount || 0) - Math.abs(a.amount || 0);
+      if (d) return d;
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+  }
+
   function planTotal(section, cycleKey) {
     return R(planItems(section).reduce(function (t, it) {
       return t + planAmount(it, cycleKey);
@@ -471,6 +489,7 @@
     netWorth: netWorth,
     planSections: planSections,
     planItems: planItems,
+    planItemsSorted: planItemsSorted,
     findPlanItem: findPlanItem,
     isActiveInCycle: isActiveInCycle,
     planAmount: planAmount,

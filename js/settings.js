@@ -32,7 +32,7 @@
   function exportPlanCsv() {
     var rows = [['Section', 'Name', 'Amount', 'Account', 'Due type', 'Due', 'Ends after']];
     ['income', 'commitments', 'savings'].forEach(function (sec) {
-      Calc.planItems(sec).forEach(function (it) {
+      Calc.planItemsSorted(sec, C.currentCycleKey()).forEach(function (it) {
         var acc = Calc.account(it.accountId);
         rows.push([sec, it.name, (it.amount || 0).toFixed(2), acc ? acc.name : '',
           it.dueType || 'day', it.dueType === 'date' ? (it.dueDate || '') : (it.dueDay || ''), it.endMonth || '']);

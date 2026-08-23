@@ -162,6 +162,55 @@ const eq = (label, a, b) => check(label, Math.abs(a - b) < 0.02, 'got=' + a + ' 
   [...w.document.querySelectorAll('.seg')].filter(b => b.textContent === 'Spendable')[0].click();
   await wait(60);
 
+  /* Plan lists are ordered biggest-first, and the same order shows up in the
+     checklist drawer that opens from this tab. */
+  w.App.go('plan');
+  await wait(60);
+  const planNames = sec =>
+    [...w.document.querySelectorAll('.plan-' + sec + ' .plan-name')].map(n => n.textContent);
+  await Actions.savePlanItem('commitments', { id: 'c2', name: 'Kereta', amount: 850, accountId: 'a1', dueType: 'day', dueDay: 5, cycleOverrides: {} });
+  await Actions.savePlanItem('commitments', { id: 'c3', name: 'Internet', amount: 149, accountId: 'a1', dueType: 'day', dueDay: 8, cycleOverrides: {} });
+  await Actions.savePlanItem('commitments', { id: 'c4', name: 'Insurans', amount: 2400, accountId: 'a1', dueType: 'day', dueDay: 9, cycleOverrides: {} });
+  w.App.go('plan');
+  await wait(60);
+  check('commitments listed biggest first',
+    planNames('commitments').join(',') === 'Insurans,Rent,Kereta,Internet', planNames('commitments').join(','));
+
+  /* A per-cycle override must reorder with it, not just restyle the amount. */
+  const kereta = S.plan.commitments.filter(i => i.id === 'c2')[0];
+  await Actions.savePlanItem('commitments', Object.assign({}, kereta, { cycleOverrides: { [cycle]: 3000 } }));
+  w.App.go('plan');
+  await wait(60);
+  check('a per-cycle override reorders the list',
+    planNames('commitments')[0] === 'Kereta', planNames('commitments').join(','));
+  await Actions.savePlanItem('commitments', Object.assign({}, kereta, { cycleOverrides: {} }));
+
+  /* An item that has ended is 0 this cycle, so it sinks to the bottom. */
+  await Actions.savePlanItem('commitments',
+    Object.assign({}, S.plan.commitments.filter(i => i.id === 'c4')[0],
+      { endMonth: Cycles.shiftCycleKey(cycle, -1) }));
+  w.App.go('plan');
+  await wait(60);
+  check('an ended item sinks to the bottom',
+    planNames('commitments').slice(-1)[0] === 'Insurans', planNames('commitments').join(','));
+  await Actions.savePlanItem('commitments',
+    Object.assign({}, S.plan.commitments.filter(i => i.id === 'c4')[0], { endMonth: null }));
+
+  w.Checklist.open();
+  await wait(120);
+  const checkNames = [...w.document.querySelectorAll('.sheet .check-list .plan-name, .sheet .check-list .check-name')]
+    .map(n => n.textContent);
+  /* Sections keep their own order (income, then commitments, then savings),
+     so look for the commitments run rather than the head of the whole list. */
+  check('the checklist drawer uses the same order',
+    checkNames.join(',').indexOf('Insurans,Rent,Kereta,Internet') > -1, checkNames.join(','));
+  w.document.querySelector('.sheet-head .icon-btn').click();
+  await wait(300);
+
+  /* Totals must not care about display order. */
+  eq('reordering does not change the commitments total',
+    Calc.planTotal('commitments', cycle), 1200 + 850 + 149 + 2400);
+
   w.App.go('plan');
   await wait(60);
   eq('Plan pool === cycle pool', money(txt('.plan-pool')), Calc.cyclePool(cycle));

@@ -11,7 +11,7 @@
   };
 
   function section(name, cycleKey) {
-    var items = Calc.planItems(name);
+    var items = Calc.planItemsSorted(name, cycleKey);   /* biggest first */
     var total = Calc.planTotal(name, cycleKey);
     var wrap = el('section', { class: 'card plan-sec plan-' + name });
     wrap.appendChild(el('div', { class: 'sec-head' }, [
