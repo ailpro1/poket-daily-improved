@@ -173,8 +173,17 @@
     UI.$('#fab').hidden = current === 'plan' || current === 'breakdown';
   }
 
+  /* Re-tapping the tab you're already on is a "scroll to top" gesture, not a
+     navigation — so it must not tear down and re-render the page underneath
+     the user. A genuine switch still jumps instantly; refresh() also scrolls
+     to the top, which matters for actions that call it directly. */
   function go(tab) {
     if (!TABS[tab]) return;
+    if (tab === current) {
+      var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
+      return;
+    }
     current = tab;
     window.scrollTo(0, 0);
     refresh();
