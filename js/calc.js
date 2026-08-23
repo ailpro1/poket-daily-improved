@@ -241,6 +241,52 @@
       - planOutstanding('commitments', key) - planOutstanding('savings', key));
   }
 
+  /* ---------- money in, planned and unplanned ----------------------------
+     The mirror of planBreakdown(). categoryTotals(..., 'income') only ever
+     showed income the user logged by hand, because a ticked-off Plan income
+     item writes a checklist log and affectsBudget() excludes those. So
+     planned income — usually the salary, i.e. nearly all of it — was missing
+     from the chart entirely. This puts both in, once each: the Plan item
+     carries the amount, its log stays excluded, so nothing double-counts. */
+  function incomeBreakdown(cycleKey) {
+    var r = C.getCycleRangeForKey(cycleKey);
+    var items = [], total = 0, received = 0;
+
+    planItems('income').forEach(function (it) {
+      var amt = planAmount(it, cycleKey);       /* 0 when inactive this cycle */
+      if (!amt) return;
+      var log = planItemLog(cycleKey, it.id);
+      items.push({
+        id: it.id, name: it.name, kind: 'plan', amount: amt,
+        received: !!log, accountId: it.accountId
+      });
+      total += amt;
+      if (log) received += amt;
+    });
+
+    /* Anything logged by hand is money that actually arrived, so it counts
+       as received whether or not it was ever planned. */
+    categoryTotals(r.startIso, r.endIso, 'income').items.forEach(function (c) {
+      items.push({
+        id: 'cat:' + c.id, name: c.name, kind: 'logged', amount: c.amount,
+        received: true, count: c.count
+      });
+      total += c.amount;
+      received += c.amount;
+    });
+
+    items.forEach(function (i) { i.share = total ? i.amount / total : 0; });
+    items.sort(function (a, b) { return b.amount - a.amount; });
+    return {
+      total: R(total),
+      received: R(received),
+      due: R(total - received),
+      items: items,
+      planned: planTotal('income', cycleKey),
+      unplanned: R(categoryTotals(r.startIso, r.endIso, 'income').total)
+    };
+  }
+
   /* ---------- spread vs one-time (spec 3.2) ------------------------------ */
 
   /* How much of this log lands on this specific day? */
@@ -311,6 +357,18 @@
     return cache.first;
   }
 
+  /* ---------- carry-over policy ------------------------------------------
+     'on'      a surplus or shortfall follows you across cycle boundaries
+               (the original behaviour, and still the default)
+     'surplus' a surplus follows you, a shortfall is forgiven at each new
+               cycle. Generous by design: nothing ever absorbs overspending,
+               so the daily figure can only ever be flattering.
+     'off'     every cycle starts from zero; only within-cycle carry counts */
+  function carryMode() {
+    var m = (S().settings || {}).carryOver;
+    return (m === 'surplus' || m === 'off') ? m : 'on';
+  }
+
   /* ---------- daily spending budget (spec 3.3) --------------------------- */
 
   /* Walks every day from the day budgeting began up to (not including) the
@@ -329,11 +387,27 @@
     if (start >= iso) { cache[k] = 0; return 0; }
     var days = C.daysBetween(start, iso);
     if (days > 1500) { start = C.iso(C.addDays(iso, -1500)); days = 1500; }
-    var running = 0, cur = start;
+    var mode = carryMode();
+    var running = 0, cur = start, prevKey = null;
+
+    /* Crossing into a new cycle is where the policy bites. Compare keys
+       rather than re-deriving the range: this runs up to 1500 times and
+       getMonthKey() is needed for the allowance anyway. */
+    function boundary(key) {
+      if (mode !== 'on' && prevKey && key !== prevKey && (mode === 'off' || running < 0)) running = 0;
+      prevKey = key;
+    }
+
     for (var i = 0; i < days; i++) {
-      running += dailyAllowance(C.getMonthKey(cur)) - budgetDrainOnDay(cur);
+      var key = C.getMonthKey(cur);
+      boundary(key);
+      running += dailyAllowance(key) - budgetDrainOnDay(cur);
       cur = C.iso(C.addDays(cur, 1));
     }
+    /* The walk stops the day BEFORE iso, so the handoff into iso's own cycle
+       has not happened yet — and for a carry that lands on a cycle's first
+       day that is the only crossing there is. */
+    boundary(C.getMonthKey(iso));
     cache[k] = R(running);
     return cache[k];
   }
@@ -505,7 +579,9 @@
     planOutstanding: planOutstanding,
     planItemLog: planItemLog,
     planBreakdown: planBreakdown,
+    incomeBreakdown: incomeBreakdown,
     suggestMidCycleRemaining: suggestMidCycleRemaining,
+    carryMode: carryMode,
     carryInto: carryInto,
     dailyBudget: dailyBudget,
     cycleSummary: cycleSummary,

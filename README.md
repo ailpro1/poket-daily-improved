@@ -41,7 +41,7 @@ They are still real money and still move account balances, and they still appear
 in the Transaction tab's "out this cycle" total. `Calc.affectsBudget()` is the
 single predicate for this; everything that needs the rule calls it.
 
-### The two halves of Breakdown
+### The three views of Breakdown
 
 Because of that rule, discretionary spending can never account for a whole
 cycle on its own, so the Breakdown tab shows both sides of the line:
@@ -50,12 +50,21 @@ cycle on its own, so the Breakdown tab shows both sides of the line:
 |---|---|---|
 | **Spendable** | day-to-day spending by category | `Calc.categoryTotals(from, to, 'expense')` |
 | **Committed** | Plan commitments and savings, per item, with what has been ticked off | `Calc.planBreakdown(cycleKey)` |
-| **Money in** | income you logged yourself, by category | `Calc.categoryTotals(from, to, 'income')` |
+| **Money in** | Plan income per item *plus* anything logged by hand | `Calc.incomeBreakdown(cycleKey)` |
 
-The two halves are disjoint by construction — the same predicate that keeps a
-ticked-off item out of Spendable is what puts it in Committed — so nothing is
-counted twice and nothing falls between them. Planned **income** is deliberately
-absent from Committed: it is money arriving, not money going somewhere.
+The two money-out halves are disjoint by construction — the same predicate that
+keeps a ticked-off item out of Spendable is what puts it in Committed — so
+nothing is counted twice and nothing falls between them. Planned **income** is
+absent from Committed: it is money arriving, not money going somewhere. It
+belongs in Money in, which had the mirror-image problem — a ticked-off income
+item writes a checklist log, `affectsBudget()` excludes those, so the salary was
+missing from that chart entirely. `incomeBreakdown()` counts the Plan item once
+and leaves its log excluded.
+
+Every doughnut is tappable. `Charts.doughnut()` stamps each slice with a
+`data-i` and makes it focusable; `makeChart()` in `js/tab-breakdown.js` ties
+slices to list rows so a tap on either highlights both and the middle of the
+chart reads that one item back. Tapping the same thing twice clears it.
 
 ### Starting part-way through a cycle
 
@@ -82,9 +91,26 @@ already mid-cycle when it first booted is asked the question once.
 
 `Calc.carryInto(date)` walks every day from the day budgeting actually began up
 to the given day, accumulating `allowance − real spend`. That one walk produces
-both within-cycle and across-cycle carry-over, so a surplus or deficit never
-resets at a cycle boundary. `Calc.firstActivityIso()` is the lower bound, so
-today's plan is never applied retroactively to days before the user had one.
+both within-cycle and across-cycle carry-over. `Calc.firstActivityIso()` is the
+lower bound, so today's plan is never applied retroactively to days before the
+user had one.
+
+What survives a **cycle boundary** is a setting, `carryOver`, read through
+`Calc.carryMode()`:
+
+| Value | At each new cycle |
+|---|---|
+| `on` (default) | nothing resets — a surplus or a shortfall both follow you |
+| `surplus` | a surplus follows you, a shortfall is forgiven |
+| `off` | the balance resets to zero; only within-cycle carry counts |
+
+Within a cycle every mode behaves identically — the policy only ever fires at
+the seam. `surplus` is deliberately generous: nothing absorbs an overspend, so
+the daily figure can only ever flatter you. The reset lives in one place, a
+`boundary()` call in `carryInto()`, applied both between walked days *and* on
+the handoff into the target day's own cycle — a carry landing on a cycle's
+first day crosses no boundary inside the loop at all, which is the case that is
+easy to get wrong. `tools/selfcheck-carry.js` pins all of it.
 
 ### Transfers
 
@@ -176,6 +202,7 @@ Development-only; nothing in `tools/` ships or is referenced by the app.
 node tools/selfcheck.js     # the spec's 7-step scenario against calc.js directly
 node tools/selfcheck-midcycle.js  # the mid-cycle-start rule, in isolation
 node tools/selfcheck-cycles.js    # cycle date maths for every start day, 1-31
+node tools/selfcheck-carry.js     # what a surplus or shortfall does at a cycle seam
 node tools/check-cache.js   # every asset is in the service worker precache
 node tools/release.js --check      # sw.js CACHE was bumped for the assets that changed
 node tools/smoke.js         # boots the app in jsdom, reads numbers back off the DOM
