@@ -251,6 +251,7 @@ body.no-scroll { overflow: hidden; }
   box-shadow: var(--shadow-sm);
 }
 .card-note { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+.help-para { margin: 4px 0 16px; font-size: 13.5px; line-height: 1.5; color: var(--text2); }
 .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 
 /* ---------- hero (the signature) ------------------------------------------ */
@@ -1041,6 +1042,31 @@ body.no-scroll { overflow: hidden; }
 :root[data-card-style="frosted"] .hero-foot { color: var(--text2); opacity: 1; }
 :root[data-card-style="frosted"] .bal-sub { color: var(--text3); }
 
+/* ---------- frosted: the ordinary cards on every other tab ----------
+   Same glass surface as the three above, but built from the neutral theme
+   tokens rather than a fixed peach/green/blue, so it works on any card.
+   Deliberately no drifting orbs out here: they are per-card infinite
+   animations, and a scrolling list of eight of them is both noisy and
+   expensive on a phone. The headline cards keep them. */
+:root[data-card-style="frosted"] .card,
+:root[data-card-style="frosted"] .acc-card {
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  border: 1.5px solid color-mix(in srgb, #fff 60%, transparent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .07), inset 0 1px 0 rgba(255, 255, 255, .7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+:root[data-theme="dark"][data-card-style="frosted"] .card,
+:root[data-theme="dark"][data-card-style="frosted"] .acc-card {
+  background: color-mix(in srgb, var(--surface) 45%, transparent);
+  border-color: rgba(255, 255, 255, .12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+/* The jade spine on the two headline cards would fight the glass edge. */
+:root[data-card-style="frosted"] .net-card,
+:root[data-card-style="frosted"] .plan-hero { border-left-width: 1.5px; }
+
 /* ---------- neumorphism ---------- */
 :root[data-card-style="neumorphism"] .hero,
 :root[data-card-style="neumorphism"] .bal-general,
@@ -1110,3 +1136,25 @@ body.no-scroll { overflow: hidden; }
 }
 :root[data-card-style="neumorphism"] .hero-foot { color: var(--text2); opacity: 1; border-top-color: rgba(0,0,0,0.06); }
 :root[data-card-style="neumorphism"] .bal-sub { color: var(--text3); }
+
+/* ---------- neumorphism: the ordinary cards on every other tab ----------
+   Soft extruded surface from the theme tokens, same reasoning as above. */
+:root[data-card-style="neumorphism"] .card,
+:root[data-card-style="neumorphism"] .acc-card {
+  border: none;
+  background: var(--surface);
+  box-shadow: 6px 6px 14px rgba(0, 0, 0, .10), -6px -6px 14px rgba(255, 255, 255, .85);
+}
+:root[data-theme="dark"][data-card-style="neumorphism"] .card,
+:root[data-theme="dark"][data-card-style="neumorphism"] .acc-card {
+  box-shadow: 6px 6px 14px rgba(0, 0, 0, .55), -6px -6px 14px rgba(255, 255, 255, .05);
+}
+/* border:none above would drop the jade spine, so put it back as a shadow. */
+:root[data-card-style="neumorphism"] .net-card,
+:root[data-card-style="neumorphism"] .plan-hero {
+  box-shadow: inset 3px 0 0 var(--jade), 6px 6px 14px rgba(0, 0, 0, .10), -6px -6px 14px rgba(255, 255, 255, .85);
+}
+:root[data-theme="dark"][data-card-style="neumorphism"] .net-card,
+:root[data-theme="dark"][data-card-style="neumorphism"] .plan-hero {
+  box-shadow: inset 3px 0 0 var(--jade), 6px 6px 14px rgba(0, 0, 0, .55), -6px -6px 14px rgba(255, 255, 255, .05);
+}

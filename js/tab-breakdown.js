@@ -30,7 +30,7 @@
 
   /* Ties one doughnut to one list so a tap on either highlights both, and
      the centre of the chart reads back whatever is selected. */
-  function makeChart(items, centreTop, centreSub, note, rowMeta) {
+  function makeChart(items, centreTop, centreSub, rowMeta) {
     var holder = el('div', {
       class: 'chart-holder',
       html: root.Charts.doughnut(items, { size: 200, centerTop: centreTop, centerSub: centreSub })
@@ -91,7 +91,6 @@
     });
 
     if (items.length) card.appendChild(el('p', { class: 'cat-hint', text: 'Tap a slice to read it on its own.' }));
-    card.appendChild(el('p', { class: 'card-note', text: note }));
     paint();
     return { card: card, list: list };
   }
@@ -121,8 +120,8 @@
     }));
   }
 
-  function draw(host, items, centreTop, centreSub, note, rowMeta, barsTitle) {
-    var built = makeChart(items, centreTop, centreSub, note, rowMeta);
+  function draw(host, items, centreTop, centreSub, rowMeta, barsTitle) {
+    var built = makeChart(items, centreTop, centreSub, rowMeta);
     host.appendChild(built.card);
     if (!items.length) return false;
     host.appendChild(built.list);
@@ -136,7 +135,6 @@
     var r = C.getCycleRangeForKey(cycleKey);
     var data = Calc.categoryTotals(r.startIso, r.endIso, 'expense');
     var drawn = draw(host, data.items, Fmt.moneyShort(data.total), 'spendable',
-      'Day-to-day spending only. Anything ticked off your Plan sits under Committed instead — the same rule the daily budget uses, so this total always matches.',
       function (c) { return Math.round(c.share * 100) + '% · ' + c.count + ' item' + (c.count === 1 ? '' : 's'); },
       'Share of spending');
     if (!drawn) {
@@ -151,7 +149,6 @@
   function renderCommitted(host, cycleKey) {
     var data = Calc.planBreakdown(cycleKey);
     var drawn = draw(host, data.items, Fmt.moneyShort(data.total), 'committed',
-      'Commitments and savings from your Plan for this cycle. The daily budget already subtracts all of it, which is why none of it shows under Spendable.',
       function (c) {
         return SECTION_LABEL[c.section] + ' · ' + Math.round(c.share * 100) + '% · ' +
           (c.paid ? 'ticked off' : 'not yet paid');
@@ -179,7 +176,6 @@
   function renderIncome(host, cycleKey) {
     var data = Calc.incomeBreakdown(cycleKey);
     var drawn = draw(host, data.items, Fmt.moneyShort(data.total), 'money in',
-      'Your Plan\'s income alongside anything you logged by hand. A planned item you ticked off is counted once, as the item — its transaction is not added on top.',
       function (c) {
         return (c.kind === 'plan' ? 'Planned' : 'Logged') + ' · ' + Math.round(c.share * 100) + '% · ' +
           (c.received ? 'received' : 'not in yet');

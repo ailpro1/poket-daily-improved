@@ -60,7 +60,7 @@
     host.appendChild(el('section', { class: 'card plan-hero' }, [
       el('span', { class: 'eyebrow', text: 'Plan for ' + C.cycleLabel(cycleKey) }),
       el('p', { class: 'plan-pool num', text: Fmt.money(pool) }),
-      el('p', { class: 'card-note', text: 'Left to live on after commitments and savings — ' + Fmt.money(per) + ' a day. This drives the forecast on Home, not your account balances.' })
+      el('p', { class: 'card-note', text: Fmt.money(per) + ' a day' })
     ]));
 
     ['income', 'commitments', 'savings'].forEach(function (s) {

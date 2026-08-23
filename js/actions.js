@@ -120,6 +120,55 @@
     return root.DB.putMany('logs', [out, inn]).then(commit);
   }
 
+  /* ---------- refunds and reimbursements ---------------------------------
+     Money coming back on something already logged. It is a plain income log,
+     which is the whole trick: budgetDrainOnDay() nets income off the day's
+     spend, so the daily budget gets the money back on its own.
+
+     It must NOT inherit sourceChecklistId. affectsBudget() excludes
+     checklist logs, so a refund carrying that field would credit nothing.
+     A refund of a planned commitment still belongs in the budget: the pool
+     subtracted the whole commitment, so getting part of it back means that
+     much was never really committed. */
+  var REFUND_CATEGORY = { id: 'cat_refund', name: 'Refund' };
+
+  /* Older installs predate the default category, so make sure it is there
+     before a log points at it — otherwise the Log tab cannot filter by it. */
+  function ensureRefundCategory() {
+    var cats = root.S.settings.categories || (root.S.settings.categories = { income: [], expense: [] });
+    if (!cats.income) cats.income = [];
+    var have = cats.income.some(function (c) { return c.id === REFUND_CATEGORY.id; });
+    if (have) return Promise.resolve();
+    cats.income.push({ id: REFUND_CATEGORY.id, name: REFUND_CATEGORY.name });
+    return saveSettings({ categories: cats });
+  }
+
+  function refundsFor(logId) {
+    return root.S.logs.filter(function (l) { return l.refundOfLogId === logId; });
+  }
+
+  function refundedTotal(logId) {
+    return root.Fmt.round2(refundsFor(logId).reduce(function (t, l) { return t + Math.abs(l.amount || 0); }, 0));
+  }
+
+  function addRefund(original, data) {
+    data = data || {};
+    return ensureRefundCategory().then(function () {
+      return addLog({
+        name: data.name || ('Refund · ' + (original.name || 'transaction')),
+        amount: Math.abs(data.amount || 0),
+        type: 'income',
+        spreadType: 'onetime',
+        date: data.date || C.iso(C.today()),
+        /* Back to the account it left, unless the user picked another. */
+        accountId: data.accountId || original.accountId,
+        categoryId: REFUND_CATEGORY.id,
+        categoryName: REFUND_CATEGORY.name,
+        refundOfLogId: original.id
+      });
+    });
+  }
+
   /* ---------- checklist (spec 3.1) ---------------------------------------- */
 
   function checklistKey(cycleKey, itemId) { return cycleKey + ':' + itemId; }
@@ -240,6 +289,9 @@
     deleteLog: deleteLog,
     undoDelete: undoDelete,
     addTransfer: addTransfer,
+    addRefund: addRefund,
+    refundsFor: refundsFor,
+    refundedTotal: refundedTotal,
     checklistKey: checklistKey,
     checklistLogFor: checklistLogFor,
     isChecked: isChecked,

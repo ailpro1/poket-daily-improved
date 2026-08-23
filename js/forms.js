@@ -92,6 +92,19 @@
           spread, function (v) { spread = v; }
         ), 'Spread splits it evenly across the days left in its cycle.'));
 
+        /* Refunds are their own log, so offer it on anything already saved —
+           a planned commitment can be reimbursed just as easily as a coffee. */
+        if (!isNew && !root.Calc.isTransfer(log)) {
+          var back = root.Actions.refundedTotal(log.id);
+          body.appendChild(el('button', {
+            class: 'btn btn-ghost btn-block', text: back ? 'Refund again' : 'Refund or reimburse',
+            onclick: function () { s.close(); refund(log); }
+          }));
+          if (back) {
+            body.appendChild(el('p', { class: 'sheet-note', text: Fmt.money(back) + ' already refunded on this.' }));
+          }
+        }
+
         var actions = el('div', { class: 'row-actions' });
         if (!isNew) {
           actions.appendChild(el('button', {
@@ -125,6 +138,61 @@
           }
         }));
         body.appendChild(actions);
+      }
+    });
+  }
+
+  /* ---------- refund / reimbursement -------------------------------------
+     Reachable from any logged transaction, planned or not. Writes a separate
+     income log rather than editing the original down, so the history keeps
+     both halves: what you spent, and what came back. */
+  function refund(original) {
+    var already = root.Actions.refundedTotal(original.id);
+    var spent = Math.abs(original.amount || 0);
+    var outstanding = root.Fmt.round2(Math.max(0, spent - already));
+    var planned = !!original.sourceChecklistId;
+
+    UI.sheet({
+      title: 'Refund or reimburse',
+      render: function (body, s) {
+        body.appendChild(el('p', { class: 'sheet-note', text: original.name + ' · ' + Fmt.money(spent) + ' on ' + C.dateLabel(original.date) }));
+
+        var amount = el('input', { class: 'input input-amount' });
+        root.CentInput.bind(amount, outstanding || '');
+        body.appendChild(UI.field('How much came back', amount,
+          already ? Fmt.money(already) + ' of ' + Fmt.money(spent) + ' already refunded.'
+            : 'Defaults to the whole amount — change it for a partial refund.'));
+
+        var name = el('input', { class: 'input', type: 'text', value: 'Refund · ' + (original.name || ''), placeholder: 'Reimbursed by work…' });
+        body.appendChild(UI.field('What to call it', name));
+
+        var acc = UI.select(accountOptions(), original.accountId);
+        body.appendChild(UI.field('Into which account', acc, 'Defaults to the one it was paid from.'));
+
+        var date = dateInput(C.iso(C.today()));
+        body.appendChild(UI.field('When it came back', date));
+
+        body.appendChild(el('p', { class: 'sheet-note', text: planned
+          ? 'Logs as money in. Your Plan still commits the full amount, so getting part of it back gives that much to your daily budget.'
+          : 'Logs as money in, which cancels this spending out of your daily budget for that day.' }));
+
+        body.appendChild(el('div', { class: 'row-actions' }, [
+          el('button', {
+            class: 'btn btn-primary', text: 'Log the refund',
+            onclick: function () {
+              var amt = root.CentInput.value(amount);
+              if (!amt) { UI.toast('Enter an amount first', { tone: 'warn' }); amount.focus(); return; }
+              root.Actions.addRefund(original, {
+                amount: amt, name: name.value.trim(), accountId: acc.value, date: date.value
+              }).then(function () {
+                s.close();
+                UI.toast(amt > outstanding && outstanding > 0
+                  ? 'Refund logged — more than was outstanding'
+                  : 'Refund logged');
+              });
+            }
+          })
+        ]));
       }
     });
   }
@@ -356,6 +424,7 @@
   root.Forms = {
     ICONS: ICONS,
     transaction: transaction,
+    refund: refund,
     transfer: transfer,
     account: account,
     planItem: planItem,

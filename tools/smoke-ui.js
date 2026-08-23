@@ -81,6 +81,13 @@ w.addEventListener('error', e => errors.push(e.message));
   q('.sheet-body input[type=text]').value = 'Maybank Islamic Current Account';
   type(q('.input-amount'), '250000');
   check('cent-first input reads digits from the cents place', q('.input-amount').value.indexOf('2,500.00') > -1, q('.input-amount').value);
+  /* CentInput.set() has to paint the field itself before firing 'input', or
+     that handler re-reads the stale text and undoes the write. */
+  w.CentInput.set(q('.input-amount'), 1234.5);
+  check('setting an amount from code actually sticks',
+    w.CentInput.value(q('.input-amount')) === 1234.5, w.CentInput.value(q('.input-amount')));
+  check('and the field shows what was set', /1,234\.50/.test(q('.input-amount').value), q('.input-amount').value);
+  w.CentInput.set(q('.input-amount'), 2500);
   byText('.btn', 'Add account').click(); await wait(120);
   check('account saved from the form', w.S.accounts.length === 1 && w.S.accounts[0].startBalance === 2500);
   check('Monthly Balance picks it up immediately', w.Calc.monthlyBalance() === 2500);
@@ -220,6 +227,81 @@ w.addEventListener('error', e => errors.push(e.message));
   check('a join date from an older cycle is deliberately left alone',
     w.Onboarding.midCyclePending() === false);
   await w.Actions.saveSettings({ midCycleAsked: true, midCycleJoinDate: null });
+
+  // refund a logged transaction from its edit sheet
+  const spendLog = w.S.logs.filter(l => !l.transferPairId && !l.sourceChecklistId && l.type === 'expense')[0];
+  const accBefore = w.Calc.monthlyBalance();
+  w.Forms.transaction(spendLog); await wait();
+  check('the edit sheet offers a refund', !!byText('.btn', 'Refund or reimburse'));
+  byText('.btn', 'Refund or reimburse').click(); await wait();
+  check('the refund sheet opens',
+    /Refund or reimburse/.test(sheet().querySelector('.sheet-title').textContent),
+    sheet().querySelector('.sheet-title').textContent);
+  check('and prefills the whole amount',
+    w.CentInput.value(q('.input-amount')) === Math.abs(spendLog.amount),
+    w.CentInput.value(q('.input-amount')));
+  byText('.btn', 'Log the refund').click(); await wait(250);
+  const rf = w.S.logs.filter(l => l.refundOfLogId === spendLog.id)[0];
+  check('a refund log is written', !!rf);
+  check('it is income, not a negative expense', rf.type === 'income', rf.type);
+  check('it links back to what it refunds', rf.refundOfLogId === spendLog.id);
+  check('it does NOT inherit sourceChecklistId', !rf.sourceChecklistId);
+  check('it lands in the Refund category', rf.categoryId === 'cat_refund', rf.categoryId);
+  check('Refund is a real income category, so the Log filter can find it',
+    (w.S.settings.categories.income || []).some(c => c.id === 'cat_refund'));
+  check('the money is back in the account',
+    Math.abs(w.Calc.monthlyBalance() - (accBefore + Math.abs(spendLog.amount))) < 0.01,
+    w.Calc.monthlyBalance() + ' vs ' + (accBefore + Math.abs(spendLog.amount)));
+
+  // a planned commitment can be reimbursed the same way
+  /* Tick a commitment so there IS a Plan-sourced expense to reimburse. */
+  if (!w.S.plan.commitments.length) {
+    await w.Actions.savePlanItem('commitments', {
+      id: 'c_rf', name: 'Sewa', amount: 900, accountId: w.S.accounts[0].id,
+      dueType: 'day', dueDay: 1, cycleOverrides: {}
+    });
+  }
+  await w.Actions.setChecked(w.App.cycleKey(), 'commitments', w.S.plan.commitments[0], true);
+  await wait(150);
+  const planLog = w.S.logs.filter(l => l.sourceChecklistId && l.type === 'expense')[0];
+  check('there is a Plan-sourced expense to reimburse', !!planLog);
+  w.Forms.transaction(planLog); await wait();
+  check('a Plan-sourced transaction offers it too', !!byText('.btn', 'Refund or reimburse'));
+  byText('.btn', 'Refund or reimburse').click(); await wait();
+  byText('.btn', 'Log the refund').click(); await wait(250);
+  const rf2 = w.S.logs.filter(l => l.refundOfLogId === planLog.id)[0];
+  check('the reimbursement is written as plain income', !!rf2 && !rf2.sourceChecklistId && rf2.type === 'income');
+
+  // and the Transaction tab labels both halves
+  w.App.go('log'); await wait();
+  check('the log tags the refund row', /refund/.test(D.querySelector('#app-main').textContent));
+
+  // the ? button carries the wordy explanations instead of the cards
+  const esc = () => D.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape' }));
+  for (const tab of ['home', 'log', 'plan', 'accounts', 'breakdown']) {
+    w.App.go(tab); await wait();
+    const help = [...D.querySelectorAll('#app-head .icon-btn')].filter(b => b.textContent === '?')[0];
+    check(tab + ' tab has a ? in the header', !!help);
+    help.click(); await wait();
+    const title = sheet().querySelector('.sheet-title').textContent;
+    check(tab + ' help names the page', title === w.App.HELP[tab].title + ' — how it works', title);
+    check(tab + ' help has real content', sheet().querySelectorAll('.help-para').length === w.App.HELP[tab].body.length);
+    esc(); await wait(300);
+  }
+  w.App.go('accounts'); await wait();
+  check('the Accounts card no longer carries the explanation',
+    !/live sum of the cards below/.test(D.querySelector('#app-main').textContent));
+  w.App.go('breakdown'); await wait();
+  check('the Breakdown chart card no longer carries its paragraph',
+    !/the same rule the daily budget uses/.test(D.querySelector('#app-main').textContent));
+
+  // card style applies beyond Home
+  await w.Actions.saveSettings({ cardStyle: 'frosted' });
+  w.App.applyCardStyle();
+  check('the card style is on the root element for every tab to inherit',
+    D.documentElement.dataset.cardStyle === 'frosted', D.documentElement.dataset.cardStyle);
+  await w.Actions.saveSettings({ cardStyle: 'flat' });
+  w.App.applyCardStyle();
 
   // re-tapping the active nav tab scrolls to top without tearing the page down;
   // switching to a different tab still jumps instantly and re-renders.
