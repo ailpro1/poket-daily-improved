@@ -652,6 +652,18 @@ body.no-scroll { overflow: hidden; }
   animation: itemSlideIn .3s ease;
 }
 .cat-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+/* category manager rows: name + usage, then rename and delete */
+.cat-manage { list-style: none; margin: 10px 0 12px; padding: 0; }
+.cat-manage li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+}
+.cat-manage li:last-child { border-bottom: 0; }
+.cat-manage-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .cat-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .cat-name { font-size: 14px; font-weight: 600; }
 .bar-row { display: flex; align-items: center; gap: 10px; margin-top: 9px; }

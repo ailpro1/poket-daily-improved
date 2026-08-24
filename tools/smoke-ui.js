@@ -230,6 +230,86 @@ w.addEventListener('error', e => errors.push(e.message));
 
   const esc2 = () => D.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape' }));
 
+  // managing categories. Each log keeps its own copy of categoryName, and the
+  // Breakdown displays that copy — so a rename that only touched settings
+  // would leave every past transaction showing the old name.
+  /* Seed the state rather than depending on what earlier steps happened to
+     leave behind — the first cut of this test picked a category with no logs
+     and two assertions passed vacuously. */
+  const seeded = await w.Actions.addCategory('expense', 'Kedai Runcit');
+  const catId = seeded.id;
+  const beforeName = seeded.name;
+  const spendable = w.S.logs.filter(l => l.type === 'expense' && !l.sourceChecklistId).slice(0, 2);
+  for (const l of spendable) {
+    await w.Actions.updateLog(l.id, { categoryId: catId, categoryName: beforeName });
+  }
+  await wait(120);
+  const usingBefore = w.Actions.logsUsingCategory(catId).length;
+  check('there is a category in use to work with',
+    spendable.length > 0 && usingBefore === spendable.length,
+    beforeName + ' on ' + usingBefore + ' of ' + spendable.length + ' seeded');
+  await w.Actions.renameCategory('expense', catId, 'Barang Rumah');
+  await wait(150);
+  check('renaming updates the category itself',
+    w.Actions.categoryList('expense').filter(c => c.id === catId)[0].name === 'Barang Rumah');
+  check('and back-fills every transaction using it',
+    w.Actions.logsUsingCategory(catId).every(l => l.categoryName === 'Barang Rumah'),
+    w.Actions.logsUsingCategory(catId).map(l => l.categoryName).join(','));
+  check('so the Breakdown shows the new name, not the old one', (() => {
+    const r = w.Cycles.getCycleRangeForKey(w.App.cycleKey());
+    const items = w.Calc.categoryTotals(r.startIso, r.endIso, 'expense').items;
+    return items.some(i => i.name === 'Barang Rumah') && !items.some(i => i.name === beforeName);
+  })());
+  check('it survives a write to the database',
+    (await w.DB.all('logs')).filter(l => l.categoryId === catId).every(l => l.categoryName === 'Barang Rumah'));
+
+  // deleting a category in use must move its transactions, never orphan them
+  const moveTo = w.Actions.categoryList('expense').filter(c => c.id !== catId)[0];
+  const movedCount = w.Actions.logsUsingCategory(catId).length;
+  const moved = await w.Actions.deleteCategory('expense', catId, moveTo.id);
+  await wait(150);
+  check('the category is gone from the list',
+    !w.Actions.categoryList('expense').some(c => c.id === catId));
+  check('it reports how many transactions moved', moved === movedCount, moved + ' vs ' + movedCount);
+  check('nothing is left pointing at the deleted category',
+    w.Actions.logsUsingCategory(catId).length === 0);
+  check('those transactions carry the new category, id and name',
+    (await w.DB.all('logs')).filter(l => l.categoryName === moveTo.name)
+      .some(l => l.categoryId === moveTo.id));
+
+  // deleting with no destination leaves them with no category, still present
+  const orphanCat = await w.Actions.addCategory('expense', 'Sementara');
+  const logCount = w.S.logs.length;
+  await w.Actions.updateLog(w.S.logs.filter(l => l.type === 'expense' && !l.sourceChecklistId)[0].id,
+    { categoryId: orphanCat.id, categoryName: orphanCat.name });
+  await wait(100);
+  check('a fresh category can be used', w.Actions.logsUsingCategory(orphanCat.id).length === 1);
+  await w.Actions.deleteCategory('expense', orphanCat.id, null);
+  await wait(150);
+  check('deleting with no destination keeps the transactions', w.S.logs.length === logCount, w.S.logs.length);
+  check('they just have no category now',
+    (await w.DB.all('logs')).filter(l => l.categoryId === null && l.categoryName === null).length > 0);
+  check('and the Breakdown files them under No category', (() => {
+    const r = w.Cycles.getCycleRangeForKey(w.App.cycleKey());
+    return w.Calc.categoryTotals(r.startIso, r.endIso, 'expense').items.some(i => i.name === 'No category');
+  })());
+
+  // both entry points open the manager
+  w.Settings.open(); await wait();
+  check('Settings offers Edit categories', !!byText('.btn', 'Edit categories'));
+  byText('.btn', 'Edit categories').click(); await wait(250);
+  check('the manager lists both kinds',
+    /Money out/.test(sheet().textContent) && /Money in/.test(sheet().textContent));
+  check('each row offers rename and delete', qq('.cat-manage li .icon-btn').length >= 2,
+    qq('.cat-manage li .icon-btn').length + ' buttons');
+  esc2(); await wait(300); esc2(); await wait(300);
+  w.Forms.transaction(); await wait();
+  check('the transaction form offers a way in too',
+    [...q('select').options].some(o => o.value === '__manage'),
+    [...q('select').options].map(o => o.value).join(','));
+  esc2(); await wait(300);
+
+
   // refund a logged transaction from its edit sheet
   const spendLog = w.S.logs.filter(l => !l.transferPairId && !l.sourceChecklistId && l.type === 'expense')[0];
   const accBefore = w.Calc.monthlyBalance();

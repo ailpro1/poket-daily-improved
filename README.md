@@ -134,6 +134,20 @@ deficit is **short**; "spread over cycle" is **split over days**. Commitments
 stays — *komitmen* is everyday Malaysian usage. Anything that explains *how a
 number works* belongs behind the `?`, not on a card.
 
+### Categories
+
+Add, rename and delete from **Settings → Edit categories**, or from the
+Category field on any transaction (`Forms.categories`).
+
+Both edits have to reach the transactions, not just the settings list: every
+log stores its **own copy** of `categoryName`, and that copy is what the
+Breakdown and the Log rows display. So `Actions.renameCategory()` back-fills
+`categoryName` on every log pointing at the category — without that, a rename
+leaves the old name showing forever. `Actions.deleteCategory()` takes a
+`moveToId` and reassigns those logs, or clears them to no category; it never
+leaves a log pointing at an id that no longer exists. Deleting a category
+still in use asks where its transactions should go rather than guessing.
+
 ### Refunds and reimbursements
 
 Tap any logged transaction and it offers **Refund or reimburse**, which writes
