@@ -50,7 +50,7 @@
     reader.onload = function () {
       var data;
       try { data = JSON.parse(reader.result); } catch (e) {
-        UI.toast('That file is not a Poket Daily backup', { tone: 'warn' });
+        UI.toast('That is not a Poket Daily backup file', { tone: 'warn' });
         return;
       }
       if (!data || data.app !== 'poket-daily') {
@@ -59,7 +59,7 @@
       }
       UI.confirm({
         title: 'Replace everything?',
-        message: 'Importing wipes what is in the app now and restores the backup in full.',
+        message: 'This clears everything in the app now and puts the backup back instead.',
         confirmLabel: 'Import backup', danger: true
       }).then(function (ok) {
         if (!ok) return;
@@ -98,20 +98,20 @@
     var mode = (st.midCycleMode || 'prorate') === 'remaining' ? 'remaining' : 'prorate';
 
     body.appendChild(el('div', { class: 'kv-split' }));
-    body.appendChild(el('span', { class: 'eyebrow', text: 'This cycle' }));
+    body.appendChild(el('span', { class: 'eyebrow', text: 'Your first month' }));
 
     var joinInput = el('input', { class: 'input', type: 'date', value: join });
     body.appendChild(UI.field('Budgeting started on', joinInput,
-      'The day you began using Poket Daily. Everything before it is left out of the carry-over.'));
+      'The day you started using Poket Daily. Anything before that is not counted.'));
 
     var amountWrap = el('div', {});
     var amount = el('input', { class: 'input input-amount' });
     root.CentInput.bind(amount, st.midCycleRemaining || '');
-    amountWrap.appendChild(UI.field('Spending money you had left that day', amount));
+    amountWrap.appendChild(UI.field('Money you had left that day', amount));
     var rate = el('p', { class: 'sheet-note' });
     amountWrap.appendChild(rate);
     amountWrap.appendChild(el('button', {
-      class: 'btn btn-ghost btn-block btn-sm', text: 'Suggest a figure',
+      class: 'btn btn-ghost btn-block btn-sm', text: 'Work it out for me',
       onclick: function () {
         root.CentInput.set(amount, Math.max(0, Calc.suggestMidCycleRemaining(joinInput.value)));
       }
@@ -123,7 +123,7 @@
       rate.textContent = C.isMidCycle(joinInput.value || join)
         ? root.Fmt.money(root.CentInput.value(amount) / days) + ' a day across ' + days +
           ' day' + (days === 1 ? '' : 's') + ' to ' + endLabel + '.'
-        : 'That date is the first day of a cycle, so the normal monthly rate applies.';
+        : 'That is the first day of a month, so the normal amount applies.';
     }
     amount.addEventListener('input', paintRate);
     joinInput.addEventListener('change', paintRate);
@@ -134,10 +134,10 @@
     }
 
     body.appendChild(UI.segmented([
-      { value: 'remaining', label: 'Spread what I had left' },
-      { value: 'prorate', label: 'Normal monthly rate' }
+      { value: 'remaining', label: 'Use what I had left' },
+      { value: 'prorate', label: 'Use the normal amount' }
     ], mode, function (v) { mode = v; applyMode(); }));
-    body.appendChild(el('p', { class: 'sheet-note', text: 'Spreading uses the figure you had left instead of the Plan pool, and only for the cycle you joined in. Later cycles always use the Plan.' }));
+    body.appendChild(el('p', { class: 'sheet-note', text: 'This uses what you had left instead of your Plan, and only for the month you started in. After that it always uses the Plan.' }));
     body.appendChild(amountWrap);
     applyMode();
 
@@ -166,18 +166,18 @@
         body.appendChild(UI.field('Currency symbol', cur));
 
         var startDay = el('input', { class: 'input', type: 'number', min: '1', max: '31', value: root.S.settings.cycleStartDay });
-        body.appendChild(UI.field('Cycle starts on day', startDay,
-          'Set 25 if your month runs the 25th to the 24th. Pick 29, 30 or 31 and short months use their last day instead.'));
+        body.appendChild(UI.field('Money month starts on day', startDay,
+          'Payday, for most people. Put 25 if your month runs 25th to 24th. Pick 29, 30 or 31 and a short month uses its last day.'));
 
         var mid = midCycleSection(body);
 
         var carry = UI.select([
-          { value: 'on', label: 'Surplus and shortfall both roll over' },
-          { value: 'surplus', label: 'Only surplus rolls over' },
-          { value: 'off', label: 'Every cycle starts fresh' }
+          { value: 'on', label: 'Extra and shortage both carry over' },
+          { value: 'surplus', label: 'Only extra carries over' },
+          { value: 'off', label: 'Every month starts fresh' }
         ], root.S.settings.carryOver || 'on');
-        body.appendChild(UI.field('Carry over from last cycle', carry,
-          'Rolling both over is the honest one: underspending gives today more room, overspending takes it away. Keeping only the surplus means nothing ever absorbs an overspend, so the daily figure can only flatter you.'));
+        body.appendChild(UI.field('Carry over from last month', carry,
+          'Carrying both is the honest one: spend less and today has more room, spend more and it has less. Keeping only the extra means overspending is never paid back, so the daily figure will always look better than it is.'));
 
         var theme = UI.select(
           [{ value: 'system', label: 'Match my phone' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
@@ -190,7 +190,7 @@
           document.documentElement.dataset.cardStyle = cardStyle.value;
         });
         body.appendChild(UI.field('Card style', cardStyle,
-          'Changes the daily budget and balance cards. Preview is live; Save keeps it.'));
+          'Changes how the cards look. You can see it right away; Save keeps it.'));
 
         body.appendChild(el('div', { class: 'row-actions' }, [
           el('button', {
@@ -214,7 +214,7 @@
                    figure re-spreads over a different number of days. That is
                    unavoidable, but it must not be silent. */
                 UI.toast(dayMoved && patch.midCycleMode === 'remaining'
-                  ? 'Saved — your first cycle re-spread to the new cycle end'
+                  ? 'Saved — your first month now ends on a different day'
                   : 'Settings saved');
               });
             }
@@ -264,7 +264,7 @@
           class: 'btn btn-ghost btn-block', text: 'Run the setup guide again',
           onclick: function () { s.close(); root.Onboarding.open(0); }
         }));
-        body.appendChild(el('p', { class: 'sheet-note', text: 'Poket Daily keeps everything on this device. Back up before clearing your browser data.' }));
+        body.appendChild(el('p', { class: 'sheet-note', text: 'Everything stays on this phone. Back up before you clear your browser data.' }));
       }
     });
   }

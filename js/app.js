@@ -39,60 +39,62 @@
     home: {
       title: 'Home',
       body: [
-        ['Two different kinds of number',
-          'Monthly Balance and Savings Balance are what you actually have — added straight up from your accounts. The daily figure is a forecast built from your Plan. Different job, different number.'],
-        ['Safe to spend today',
-          'Your Plan\'s income minus commitments and savings, divided by the days in the cycle, then adjusted for what you have really spent.'],
-        ['Carry-over',
-          'Underspend and today has more room; overspend and it has less. What happens at the start of a new cycle is your choice under Settings, Carry over from last cycle.'],
-        ['If you started part-way through a cycle',
-          'The figure you said you had left is spread over the days remaining, so the first cycle is honest rather than assuming a whole month. Your Plan takes over from the next cycle. Change it under Settings, This cycle.']
+        ['Two different numbers',
+          'Spending money and Savings are what you really have, added straight up from your accounts. The daily budget is a guess worked out from your Plan. They will not match, and they are not supposed to.'],
+        ['You can spend today',
+          'Your Plan income, minus commitments and savings, shared out over the days in the month. Then adjusted for what you have really spent.'],
+        ['Tap the top card',
+          'It opens today and the next 2 days, so you can see what is coming before you spend.'],
+        ['Money left over',
+          'Spend less today and tomorrow has more. Spend more and it has less. What happens when a new month starts is up to you — see Settings, Carry over from last month.'],
+        ['If you started mid-month',
+          'We use what you said you had left, shared over the days that are left, instead of pretending you had a full month. Your Plan takes over next month. Change it in Settings, Your first month.']
       ]
     },
     log: {
       title: 'Transaction',
       body: [
-        ['In and out this cycle',
-          'Every real transaction in the cycle, including the ones ticked off your Plan. Transfers between your own accounts are not counted as either.'],
-        ['Tags on a row',
-          '"from Plan" means it came from ticking the checklist. "spread" means it is shared across the days left in its cycle rather than landing all on one day. "refund" means money that came back on something else.'],
+        ['Money in and out',
+          'Everything real this month, including things you ticked off your Plan. Moving money between your own accounts does not count as either.'],
+        ['Labels on a row',
+          '"from Plan" means you ticked it off the checklist. "split daily" means it is shared over the days left instead of all on one day. "refund" means money that came back.'],
         ['Getting money back',
-          'Tap any transaction and choose Refund or reimburse. It logs as money in, so the spending cancels out and your account balance goes back up.']
+          'Tap any transaction and choose Got money back. It goes in as money in, so the spending cancels out and your account goes back up.']
       ]
     },
     plan: {
       title: 'Plan',
       body: [
-        ['What the pool is',
-          'Income minus commitments minus savings — what is left to live on. Divided by the days in the cycle, that is your daily budget. It drives the forecast on Home, not your account balances.'],
-        ['Order',
-          'Biggest first, using this cycle\'s amount. An item you have overridden for one cycle moves with it, and one that has ended drops to the bottom.'],
+        ['Left to spend',
+          'Income minus commitments minus savings. Share that over the days in the month and you get your daily budget. This is what Home works from, not your account totals.'],
+        ['The order',
+          'Biggest first, using this month\'s amount. Change one just for this month and it moves. One that has ended drops to the bottom.'],
         ['Ticking things off',
-          'The checklist writes the real transaction against the item\'s account. Untick and that transaction is removed again.']
+          'The checklist logs the real transaction on that item\'s account. Untick it and the transaction is removed.']
       ]
     },
     accounts: {
       title: 'Accounts',
       body: [
-        ['Net Worth',
-          'Spending and saving accounts added together. All three figures are live sums of the cards below them, so they always agree.'],
-        ['Reordering',
-          'Hold a card, then drag it. The order is saved per group.'],
+        ['Total money',
+          'Your spending accounts and savings accounts added together. The arrow shows how much it has moved since this month started, and the bar shows how it splits.'],
+        ['Changing the order',
+          'Hold a card, then drag it. Each group remembers its own order.'],
         ['Moving money',
-          'A transfer is always two linked halves, so deleting one deletes both and the two balances stay in step.']
+          'A transfer always has two sides, so deleting one deletes both and your totals stay correct.']
       ]
     },
     breakdown: {
       title: 'Breakdown',
       body: [
         ['Spendable',
-          'Day-to-day spending by category. Anything ticked off your Plan is left out, because the daily budget already subtracted it — the same rule, so the totals always match.'],
+          'Your day-to-day spending, by category. Things you ticked off your Plan are not here, because the daily budget already took them out — same rule, so the totals always agree.'],
         ['Committed',
-          'The other half: commitments and savings from your Plan, per item, with what you have ticked off and what is still to pay.'],
+          'The other half: commitments and savings from your Plan, one by one, with what you have paid and what is still to go.'],
         ['Money in',
-          'Your Plan\'s income alongside anything you logged by hand. A planned item you ticked off is counted once, as the item — its transaction is not added on top.'],
+          'Your Plan income plus anything you logged yourself. A Plan item you ticked off is counted once, as the item — its transaction is not added on top.'],
         ['The charts',
-          'Tap a slice or a row and the middle of the chart reads that one back. Tap it again to go back to the total.']
+          'Tap a slice or a row and the middle of the circle shows just that one. Tap again to go back to the total.']
       ]
     }
   };
@@ -304,7 +306,7 @@
       reloading = true;
       /* Never yank a half-filled form away. */
       if (UI.busy()) {
-        UI.updateBar('Update ready. It will load when you finish here.',
+        UI.updateBar('Update ready. It will load when you are done here.',
           { actionLabel: 'Reload now', onAction: go });
         UI.onIdle(go);
         return;

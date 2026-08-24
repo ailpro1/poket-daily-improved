@@ -132,5 +132,40 @@
       '<line class="ds-line" x1="0" y1="' + line + '" x2="' + W + '" y2="' + line + '"/>' + out + '</svg>';
   }
 
-  root.Charts = { line: line, doughnut: doughnut, dayStrip: dayStrip };
+  /* Three-ish points for the next few days. Today's dot is filled because it
+     is real; the rest are hollow and the line dashed, because they assume you
+     stop spending now. Dots carry data-i so the Home sheet can tie each one
+     to its card. */
+  function forecast(points, opts) {
+    opts = opts || {};
+    var W = opts.width || 320, H = opts.height || 104;
+    var padL = 30, padR = 30, padT = 14, padB = 24;
+    if (!points.length) return '<div class="chart-empty">Nothing to show yet.</div>';
+    var vals = points.map(function (p) { return p.value; });
+    var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+    if (min === max) { min -= 1; max += 1; }
+    var room = (max - min) * 0.3;
+    min -= room; max += room;
+    var n = points.length;
+    var xAt = function (i) { return padL + (n === 1 ? (W - padL - padR) / 2 : i * (W - padL - padR) / (n - 1)); };
+    var yAt = function (v) { return padT + (max - v) / (max - min) * (H - padT - padB); };
+
+    var path = points.map(function (p, i) {
+      return (i ? 'L' : 'M') + xAt(i).toFixed(1) + ',' + yAt(p.value).toFixed(1);
+    }).join(' ');
+
+    var dots = '', labels = '';
+    points.forEach(function (p, i) {
+      var x = xAt(i).toFixed(1), y = yAt(p.value).toFixed(1);
+      dots += '<circle class="fc-dot' + (i === 0 ? ' fc-now' : '') + '" data-i="' + i + '" tabindex="0"' +
+        ' role="button" aria-label="' + esc(p.label) + '" cx="' + x + '" cy="' + y + '" r="6"><title>' +
+        esc(p.label) + '</title></circle>';
+      labels += '<text class="fc-xlab" x="' + x + '" y="' + (H - 6) + '" text-anchor="middle">' + esc(p.short) + '</text>';
+    });
+
+    return '<svg class="fcchart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Budget for the next few days">' +
+      '<path class="fc-line" d="' + path + '"/>' + dots + labels + '</svg>';
+  }
+
+  root.Charts = { line: line, doughnut: doughnut, dayStrip: dayStrip, forecast: forecast };
 })(typeof self !== 'undefined' ? self : globalThis);

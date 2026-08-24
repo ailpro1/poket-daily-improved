@@ -497,6 +497,41 @@ body.no-scroll { overflow: hidden; }
    big figure inside is enough to mark a headline card, and the coloured edge
    only ever fought whatever card style was active. Both classes are kept as
    markup hooks; deliberately no accent styling here. */
+/* Total money card: one figure, how it has moved, and how it splits. */
+.net-delta {
+  margin: 6px 0 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.net-delta.pos { color: var(--jade); }
+.net-delta.neg { color: var(--red); }
+.net-arrow { font-size: 10px; }
+.net-since { color: var(--text3); font-weight: 500; }
+.net-bar {
+  display: flex;
+  height: 8px;
+  margin: 14px 0 0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--card-2);
+}
+.net-bar-spend { background: var(--green-deep); }
+.net-bar-save { background: var(--blue-deep); }
+.net-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--text2);
+}
+.net-legend span { display: flex; align-items: center; gap: 6px; }
+.net-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.net-dot-spend { background: var(--green-deep); }
+.net-dot-save { background: var(--blue-deep); }
+
 .net-worth {
   margin: 4px 0 0;
   font-size: 30px;
@@ -553,6 +588,39 @@ body.no-scroll { overflow: hidden; }
 .chart-dot { fill: var(--jade); stroke: var(--card); stroke-width: 2; }
 .chart-zero { stroke: var(--line); stroke-width: 1; }
 .chart-xlab { font-family: var(--mono); font-size: 9px; fill: var(--muted); }
+.hero.tappable { cursor: pointer; }
+.hero.tappable:active { transform: scale(.995); }
+
+/* ---------- next-few-days forecast ---------- */
+.fcchart { width: 100%; height: auto; }
+.fc-line { fill: none; stroke: var(--jade); stroke-width: 2.2; stroke-linecap: round; stroke-dasharray: 4 4; }
+.fc-dot { fill: var(--card); stroke: var(--jade); stroke-width: 2.2; cursor: pointer; transition: r .14s ease, fill .14s ease; }
+.fc-dot.fc-now { fill: var(--jade); }
+.fc-dot.on { r: 8; }
+.fc-dot:focus { outline: none; }
+.fc-dot:focus-visible { stroke: var(--ink); }
+.fc-xlab { font-size: 10px; font-weight: 700; letter-spacing: .06em; fill: var(--text3); text-transform: uppercase; }
+
+.fc-grid { display: flex; gap: 8px; margin-top: 4px; }
+.fc-card {
+  flex: 1;
+  min-width: 0;
+  background: var(--card-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 10px 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .14s ease, background .14s ease;
+}
+.fc-card.on { border-color: var(--jade); background: var(--surface); }
+.fc-day { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text3); }
+.fc-big { display: block; margin: 4px 0 8px; font-family: var(--mono); font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+.fc-big.neg { color: var(--red); }
+.fc-part { display: block; font-size: 10px; color: var(--text3); margin-top: 5px; }
+.fc-part b { display: block; font-family: var(--mono); font-size: 11.5px; font-weight: 700; color: var(--text2); letter-spacing: -.02em; }
+.fc-sum { display: block; margin-top: 7px; padding-top: 6px; border-top: 1px solid var(--line); font-size: 10px; color: var(--text3); }
+
 .chart-empty { padding: 24px; font-size: 13px; color: var(--muted); text-align: center; }
 
 .doughnut { width: 200px; height: 200px; }
@@ -919,7 +987,25 @@ body.no-scroll { overflow: hidden; }
   font-weight: 800;
   letter-spacing: -.045em;
   line-height: 1;
+  /* The reels are inline boxes, so the row has to lay them out. */
+  display: inline-flex;
+  align-items: flex-start;
 }
+/* One reel per digit: a 1em window with a 0-9 strip sliding behind it. */
+.roll-reel {
+  display: inline-block;
+  height: 1em;
+  overflow: hidden;
+  vertical-align: top;
+}
+.roll-strip { display: block; will-change: transform; }
+.roll-cell {
+  display: block;
+  height: 1em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.roll-fixed { display: inline-block; height: 1em; line-height: 1; }
 .splash-go {
   font: inherit;
   font-size: 17px;

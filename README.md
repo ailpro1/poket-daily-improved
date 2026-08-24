@@ -29,7 +29,7 @@ There are two deliberately different kinds of number:
 
 | | Question it answers | How it is built |
 |---|---|---|
-| **Monthly Balance** / **Savings Balance** / **Net Worth** | "What do I actually have?" | Live sum of `accountBalance()` across general / saving / both |
+| **Spending money** / **Savings** / **Total money** | "What do I actually have?" | Live sum of `accountBalance()` across general / saving / both |
 | **Daily Spending Budget** | "What can I safely spend today?" | `(planned income − commitments − savings) ÷ days`, adjusted for real activity and carry-over |
 
 ### The double-counting rule
@@ -111,6 +111,28 @@ the daily figure can only ever flatter you. The reset lives in one place, a
 the handoff into the target day's own cycle — a carry landing on a cycle's
 first day crosses no boundary inside the loop at all, which is the case that is
 easy to get wrong. `tools/selfcheck-carry.js` pins all of it.
+
+### The next few days
+
+`Calc.forecastDays(n)` returns today plus the days after it, each split into
+the two parts it is made of: `rollover` (what was left at the end of the day
+before) and `allowance` (that day's own share), which add up to `budget`.
+Tapping the Home hero draws it — a dot and a card per day.
+
+Future days assume nothing more is spent today, because there is no honest way
+to guess otherwise; the cards say "If you stop now" and the note underneath
+spells it out. No new maths: `carryInto()` already walks through today, so
+today's unspent remainder becomes tomorrow's roll-over on its own. That chain
+is asserted in `smoke-ui.js` — tomorrow's `rollover` must equal today's `left`.
+
+### Wording
+
+Plain English, Malaysian usage, no accounting jargon. "Cycle" is **money
+month** or just *month*; the live account totals are **Spending money**,
+**Savings** and **Total money**, never "balance"; a surplus is **extra** and a
+deficit is **short**; "spread over cycle" is **split over days**. Commitments
+stays — *komitmen* is everyday Malaysian usage. Anything that explains *how a
+number works* belongs behind the `?`, not on a card.
 
 ### Refunds and reimbursements
 
@@ -270,6 +292,13 @@ the in-memory state. There is also a human-readable CSV export of the Plan.
   coloured edge fights whatever card style is active, and the big figure inside
   already marks the card as a headline. Both classes remain as markup hooks
   with no accent styling; don't reintroduce one.
+- **The Total money card** shows the figure, how much it has moved since the
+  month started, and a bar for the split. It deliberately does *not* repeat the
+  two group totals — those are printed next to their own headings right below it.
+- **The daily figure on the splash** spins up digit by digit (`Splash.rollInto`).
+  Each digit is a reel of 0-9 with the target appended, so the landing distance
+  is `ROLL_SPINS * 10` cells — **not** plus the digit, which overshoots into
+  blank space for everything except 0. Reduced motion gets the plain number.
 - **Card style** (`[data-card-style]` on `<html>`) covers `.card` and
   `.acc-card` on every tab, not just Home's three headline cards. The
   neutral variants are built from theme tokens rather than fixed colours. The

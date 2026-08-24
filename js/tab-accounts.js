@@ -107,9 +107,9 @@
       title: a.icon + '  ' + a.name,
       render: function (body, s) {
         var head = el('div', { class: 'acc-detail-head' }, [
-          el('span', { class: 'eyebrow', text: 'Balance now' }),
+          el('span', { class: 'eyebrow', text: 'In here now' }),
           el('p', { class: 'num acc-detail-bal', text: Fmt.money(Calc.accountBalance(a.id)) }),
-          el('p', { class: 'card-note', text: 'Opening balance ' + Fmt.money(a.startBalance) + ' · ' + (a.type === 'saving' ? 'counts towards Savings Balance' : 'counts towards Monthly Balance') })
+          el('p', { class: 'card-note', text: 'Started at ' + Fmt.money(a.startBalance) + ' · ' + (a.type === 'saving' ? 'counted as savings' : 'counted as spending money') })
         ]);
         body.appendChild(head);
 
@@ -122,7 +122,7 @@
           listHolder.innerHTML = '';
           var logs = Calc.logsInRange(r.startIso, r.endIso, function (l) { return l.accountId === a.id; });
           if (!logs.length) {
-            listHolder.appendChild(el('li', { class: 'card-note', text: 'No transactions in this cycle.' }));
+            listHolder.appendChild(el('li', { class: 'card-note', text: 'Nothing logged this month.' }));
             return;
           }
           logs.forEach(function (l) {
@@ -153,23 +153,41 @@
 
   function render(host) {
     host.innerHTML = '';
-    /* Net worth leads, with the two groups it is made of underneath — all
-       three are live sums of the cards below, so they always reconcile. */
-    host.appendChild(el('section', { class: 'card totals net-card' }, [
-      el('span', { class: 'eyebrow', text: 'Net Worth · actual' }),
-      el('p', { class: 'num net-worth', text: Fmt.money(Calc.netWorth()) }),
-      el('div', { class: 'kv-split' }),
-      el('div', { class: 'totals-row' }, [
-        el('div', { class: 'stat' }, [
-          el('span', { class: 'eyebrow', text: 'Monthly Balance' }),
-          el('b', { class: 'num stat-value', text: Fmt.money(Calc.monthlyBalance()) })
+    /* The two group totals are already printed next to their own headings
+       below, so repeating them here said nothing. What is NOT anywhere else:
+       how much the total has moved this month, and how it splits. */
+    var nw = Calc.netWorthSummary(root.App.cycleKey());
+    var up = nw.change >= 0;
+    var card = el('section', { class: 'card net-card' }, [
+      el('span', { class: 'eyebrow', text: 'Total money' }),
+      el('p', { class: 'num net-worth', text: Fmt.money(nw.total) })
+    ]);
+    if (Math.abs(nw.change) > 0.005) {
+      card.appendChild(el('p', { class: 'net-delta ' + (up ? 'pos' : 'neg') }, [
+        el('span', { class: 'net-arrow', text: up ? '▲' : '▼' }),
+        el('span', { class: 'num', text: Fmt.money(Math.abs(nw.change)) }),
+        el('span', { class: 'net-since', text: 'since ' + C.dateLabel(nw.sinceIso) })
+      ]));
+    }
+    /* One bar instead of two more numbers: the mix is the thing you cannot
+       read off the lists below at a glance. */
+    if (nw.total !== 0) {
+      card.appendChild(el('div', { class: 'net-bar' }, [
+        el('span', { class: 'net-bar-spend', style: 'width:' + (nw.spendingShare * 100).toFixed(1) + '%' }),
+        el('span', { class: 'net-bar-save', style: 'width:' + (nw.savingsShare * 100).toFixed(1) + '%' })
+      ]));
+      card.appendChild(el('div', { class: 'net-legend' }, [
+        el('span', {}, [
+          el('i', { class: 'net-dot net-dot-spend' }),
+          document.createTextNode('To spend ' + Math.round(nw.spendingShare * 100) + '%')
         ]),
-        el('div', { class: 'stat' }, [
-          el('span', { class: 'eyebrow', text: 'Savings Balance' }),
-          el('b', { class: 'num stat-value', text: Fmt.money(Calc.savingsBalance()) })
+        el('span', {}, [
+          el('i', { class: 'net-dot net-dot-save' }),
+          document.createTextNode('Saved ' + Math.round(nw.savingsShare * 100) + '%')
         ])
-      ])
-    ]));
+      ]));
+    }
+    host.appendChild(card);
 
     group('general', 'Accounts', host);
     group('saving', 'Saving Accounts', host);

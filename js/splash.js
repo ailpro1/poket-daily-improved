@@ -30,6 +30,59 @@
   /* How long the branded artwork holds the screen on every open. */
   var ART_HOLD = 3000;
 
+  /* ---------- arcade roll ------------------------------------------------
+     Each digit is a column of 0-9 that spins up and lands on its target,
+     like the reels on an old machine. Later digits run longer so the number
+     settles left to right instead of all at once.
+
+     Built from real elements rather than a text swap so it cannot land on a
+     half-rendered figure: the strip is translated, and the final position is
+     the digit itself. Anyone who has asked for less motion just gets the
+     number. */
+  var ROLL_BASE = 620;      /* ms for the first digit */
+  var ROLL_STEP = 110;      /* extra ms per digit along */
+  var ROLL_SPINS = 3;       /* full 0-9 passes before landing */
+
+  function reducedMotion() {
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+
+  function rollInto(host, text) {
+    host.innerHTML = '';
+    if (reducedMotion()) { host.textContent = text; return; }
+
+    var chars = String(text).split('');
+    var digitIndex = 0;
+    chars.forEach(function (ch) {
+      if (!/[0-9]/.test(ch)) {
+        /* commas and the decimal point stay put — only reels spin */
+        host.appendChild(UI.el('span', { class: 'roll-fixed', text: ch }));
+        return;
+      }
+      var strip = UI.el('span', { class: 'roll-strip' });
+      for (var s = 0; s < ROLL_SPINS; s++) {
+        for (var d = 0; d <= 9; d++) strip.appendChild(UI.el('span', { class: 'roll-cell', text: String(d) }));
+      }
+      strip.appendChild(UI.el('span', { class: 'roll-cell', text: ch }));
+      var reel = UI.el('span', { class: 'roll-reel' }, [strip]);
+      host.appendChild(reel);
+
+      /* The target cell is appended AFTER the filler passes, so it sits at
+         index ROLL_SPINS*10 whatever the digit is. Adding `target` here
+         overshoots into blank space for every digit except 0. Distance is in
+         cells because one cell is 1em of line box, set in CSS. */
+      var cells = ROLL_SPINS * 10;
+      var ms = ROLL_BASE + digitIndex * ROLL_STEP;
+      digitIndex += 1;
+      /* Start at the top, then let the transition run on the next frame. */
+      strip.style.transform = 'translateY(0)';
+      requestAnimationFrame(function () {
+        strip.style.transition = 'transform ' + ms + 'ms cubic-bezier(.16,.9,.24,1)';
+        strip.style.transform = 'translateY(-' + cells + 'em)';
+      });
+    });
+  }
+
   /* Resolves once the splash is done, so boot can carry on behind it. */
   function run() {
     var node = UI.$('#splash');
@@ -62,7 +115,7 @@
         if (hasPlan) {
           UI.$('.splash-label', node).textContent = db.left < 0 ? 'Today you are over by' : 'Today you can spend';
           UI.$('.splash-cur', node).textContent = amount.symbol;
-          UI.$('.splash-num', node).textContent = amount.figure.replace('-', '');
+          rollInto(UI.$('.splash-num', node), amount.figure.replace('-', ''));
           UI.$('.splash-amount', node).classList.toggle('over', db.left < 0);
         } else {
           UI.$('.splash-label', node).textContent = 'No plan set up yet';
@@ -86,5 +139,6 @@
     });
   }
 
-  root.Splash = { run: run, greeting: greeting };
+  root.Splash = {
+    rollInto: rollInto, run: run, greeting: greeting };
 })(typeof self !== 'undefined' ? self : globalThis);

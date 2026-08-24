@@ -90,7 +90,7 @@
       list.appendChild(rw);
     });
 
-    if (items.length) card.appendChild(el('p', { class: 'cat-hint', text: 'Tap a slice to read it on its own.' }));
+    if (items.length) card.appendChild(el('p', { class: 'cat-hint', text: 'Tap a slice to see just that one.' }));
     paint();
     return { card: card, list: list };
   }
@@ -139,7 +139,7 @@
       'Share of spending');
     if (!drawn) {
       host.appendChild(UI.emptyState('Nothing to break down',
-        'Log a few transactions with categories and they show up here.', 'Log a transaction',
+        'Log a few things with a category and they show up here.', 'Log a transaction',
         function () { root.Forms.transaction(); }));
     }
   }
@@ -151,17 +151,17 @@
     var drawn = draw(host, data.items, Fmt.moneyShort(data.total), 'committed',
       function (c) {
         return SECTION_LABEL[c.section] + ' · ' + Math.round(c.share * 100) + '% · ' +
-          (c.paid ? 'ticked off' : 'not yet paid');
+          (c.paid ? 'paid' : 'not paid yet');
       },
       'Share of committed money');
     if (!drawn) {
-      host.appendChild(UI.emptyState('Nothing committed this cycle',
-        'Add commitments and savings goals to your Plan and they show up here.', 'Open the Plan tab',
+      host.appendChild(UI.emptyState('Nothing committed this month',
+        'Add commitments and savings to your Plan and they show up here.', 'Open the Plan tab',
         function () { root.App.go('plan'); }));
       return;
     }
     host.appendChild(el('section', { class: 'card totals' }, [
-      statRow([['Ticked off', data.paid], ['Still to pay', data.unpaid]]),
+      statRow([['Paid', data.paid], ['Still to pay', data.unpaid]]),
       el('div', { class: 'kv-split' }),
       statRow([['Commitments', data.commitments], ['Savings', data.savings]]),
       el('button', {
@@ -178,19 +178,19 @@
     var drawn = draw(host, data.items, Fmt.moneyShort(data.total), 'money in',
       function (c) {
         return (c.kind === 'plan' ? 'Planned' : 'Logged') + ' · ' + Math.round(c.share * 100) + '% · ' +
-          (c.received ? 'received' : 'not in yet');
+          (c.received ? 'in' : 'not in yet');
       },
       'Share of money in');
     if (!drawn) {
-      host.appendChild(UI.emptyState('No money in this cycle',
+      host.appendChild(UI.emptyState('No money in this month',
         'Add your income to the Plan, or log what came in.', 'Open the Plan tab',
         function () { root.App.go('plan'); }));
       return;
     }
     host.appendChild(el('section', { class: 'card totals' }, [
-      statRow([['Received', data.received], ['Still to come', data.due]]),
+      statRow([['Already in', data.received], ['Still to come', data.due]]),
       el('div', { class: 'kv-split' }),
-      statRow([['From the Plan', data.planned], ['Logged by hand', data.unplanned]])
+      statRow([['From the Plan', data.planned], ['Logged yourself', data.unplanned]])
     ]));
   }
 

@@ -8,7 +8,7 @@
   function typeLabel(l) {
     if (l.type === 'transfer_in') return 'In from ' + accName(l.transferCounterpartAccountId);
     if (l.type === 'transfer_out') return 'Out to ' + accName(l.transferCounterpartAccountId);
-    return l.categoryName || (l.type === 'income' ? 'Income' : 'Uncategorised');
+    return l.categoryName || (l.type === 'income' ? 'Income' : 'No category');
   }
 
   function accName(id) {
@@ -26,8 +26,8 @@
        next to the cards they are the sum of. */
     host.appendChild(el('section', { class: 'card totals' }, [
       el('div', { class: 'totals-row' }, [
-        stat('In this cycle', summary.actualIncome, 'pos'),
-        stat('Out this cycle', summary.actualSpent, 'neg')
+        stat('Money in', summary.actualIncome, 'pos'),
+        stat('Money out', summary.actualSpent, 'neg')
       ])
     ]));
 
@@ -53,7 +53,7 @@
     });
 
     if (!logs.length) {
-      host.appendChild(UI.emptyState('Nothing logged in this cycle',
+      host.appendChild(UI.emptyState('Nothing logged this month',
         'Tap the + button to log what you spent.', 'Log a transaction',
         function () { root.Forms.transaction(); }));
       return;
@@ -82,7 +82,7 @@
   function logRow(l) {
     var neg = Calc.sign(l) < 0;
     var tags = [];
-    if (l.spreadType === 'spread') tags.push('spread');
+    if (l.spreadType === 'spread') tags.push('split daily');
     if (l.sourceChecklistId) tags.push('from Plan');
     if (l.refundOfLogId) tags.push('refund');
     else if (root.Actions.refundedTotal(l.id)) tags.push('refunded ' + Fmt.money(root.Actions.refundedTotal(l.id)));
@@ -108,7 +108,7 @@
       title: 'Transfer',
       render: function (body, s) {
         body.appendChild(el('p', { class: 'sheet-note', text: l.name + ' · ' + Fmt.money(Math.abs(l.amount)) + ' · ' + C.dateLabel(l.date) }));
-        body.appendChild(el('p', { class: 'sheet-note', text: 'Between ' + accName(l.accountId) + ' and ' + accName(l.transferCounterpartAccountId) + '. Deleting removes both halves so the two balances stay in step.' }));
+        body.appendChild(el('p', { class: 'sheet-note', text: 'Between ' + accName(l.accountId) + ' and ' + accName(l.transferCounterpartAccountId) + '. Deleting removes both sides, so the totals stay correct.' }));
         body.appendChild(el('div', { class: 'row-actions' }, [
           el('button', {
             class: 'btn btn-ghost btn-danger-text', text: 'Delete transfer',

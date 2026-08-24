@@ -46,7 +46,7 @@
       render: function (body, s) {
         var amount = el('input', { class: 'input input-amount', placeholder: Fmt.money(0) });
         root.CentInput.bind(amount, log.amount || '');
-        body.appendChild(UI.field('Amount', amount, 'Type digits — they fill from the cents.'));
+        body.appendChild(UI.field('Amount', amount, 'Just type the numbers — they fill in from the cents.'));
 
         var typeWrap = el('div');
         var kind = log.type === 'income' ? 'income' : 'expense';
@@ -81,27 +81,27 @@
         body.appendChild(UI.field('Category', catSel));
 
         var acc = UI.select(accountOptions(), log.accountId);
-        body.appendChild(UI.field('Account', acc, locked ? 'From your Plan — edit the item in Plan to change it.' : null));
+        body.appendChild(UI.field('Account', acc, locked ? 'This came from your Plan — change it there.' : null));
 
         var date = dateInput(log.date);
         body.appendChild(UI.field('Date', date));
 
         var spread = log.spreadType || 'onetime';
-        body.appendChild(UI.field('How it hits the budget', UI.segmented(
-          [{ value: 'onetime', label: 'All on this date' }, { value: 'spread', label: 'Spread over cycle' }],
+        body.appendChild(UI.field('How to count it', UI.segmented(
+          [{ value: 'onetime', label: 'All on this date' }, { value: 'spread', label: 'Split over days' }],
           spread, function (v) { spread = v; }
-        ), 'Spread splits it evenly across the days left in its cycle.'));
+        ), 'Splits it evenly over the days left in the month.'));
 
         /* Refunds are their own log, so offer it on anything already saved —
            a planned commitment can be reimbursed just as easily as a coffee. */
         if (!isNew && !root.Calc.isTransfer(log)) {
           var back = root.Actions.refundedTotal(log.id);
           body.appendChild(el('button', {
-            class: 'btn btn-ghost btn-block', text: back ? 'Refund again' : 'Refund or reimburse',
+            class: 'btn btn-ghost btn-block', text: back ? 'Got more back' : 'Got money back',
             onclick: function () { s.close(); refund(log); }
           }));
           if (back) {
-            body.appendChild(el('p', { class: 'sheet-note', text: Fmt.money(back) + ' already refunded on this.' }));
+            body.appendChild(el('p', { class: 'sheet-note', text: Fmt.money(back) + ' of this already came back.' }));
           }
         }
 
@@ -153,28 +153,28 @@
     var planned = !!original.sourceChecklistId;
 
     UI.sheet({
-      title: 'Refund or reimburse',
+      title: 'Got money back',
       render: function (body, s) {
         body.appendChild(el('p', { class: 'sheet-note', text: original.name + ' · ' + Fmt.money(spent) + ' on ' + C.dateLabel(original.date) }));
 
         var amount = el('input', { class: 'input input-amount' });
         root.CentInput.bind(amount, outstanding || '');
         body.appendChild(UI.field('How much came back', amount,
-          already ? Fmt.money(already) + ' of ' + Fmt.money(spent) + ' already refunded.'
-            : 'Defaults to the whole amount — change it for a partial refund.'));
+          already ? Fmt.money(already) + ' of ' + Fmt.money(spent) + ' already came back.'
+            : 'The full amount. Change it if you only got part back.'));
 
         var name = el('input', { class: 'input', type: 'text', value: 'Refund · ' + (original.name || ''), placeholder: 'Reimbursed by work…' });
         body.appendChild(UI.field('What to call it', name));
 
         var acc = UI.select(accountOptions(), original.accountId);
-        body.appendChild(UI.field('Into which account', acc, 'Defaults to the one it was paid from.'));
+        body.appendChild(UI.field('Into which account', acc, 'The one it was paid from.'));
 
         var date = dateInput(C.iso(C.today()));
         body.appendChild(UI.field('When it came back', date));
 
         body.appendChild(el('p', { class: 'sheet-note', text: planned
-          ? 'Logs as money in. Your Plan still commits the full amount, so getting part of it back gives that much to your daily budget.'
-          : 'Logs as money in, which cancels this spending out of your daily budget for that day.' }));
+          ? 'Counted as money in. Your Plan still sets aside the full amount, so what comes back goes to your daily budget.'
+          : 'Counted as money in, so it cancels out this spending for that day.' }));
 
         body.appendChild(el('div', { class: 'row-actions' }, [
           el('button', {
@@ -187,8 +187,8 @@
               }).then(function () {
                 s.close();
                 UI.toast(amt > outstanding && outstanding > 0
-                  ? 'Refund logged — more than was outstanding'
-                  : 'Refund logged');
+                  ? 'Saved — that is more than you spent'
+                  : 'Money back saved');
               });
             }
           })
@@ -218,7 +218,7 @@
         body.appendChild(UI.field('Date', date));
         var note = el('input', { class: 'input', type: 'text', placeholder: 'Optional note' });
         body.appendChild(UI.field('Note', note));
-        body.appendChild(el('p', { class: 'sheet-note', text: 'Moving between two spending accounts leaves Monthly Balance unchanged. Moving into a saving account lowers Monthly Balance and lifts Savings Balance by the same amount.' }));
+        body.appendChild(el('p', { class: 'sheet-note', text: 'Between two spending accounts, your spending money stays the same. Into a savings account, spending money goes down and savings goes up by the same amount.' }));
         body.appendChild(el('div', { class: 'row-actions' }, [
           el('button', {
             class: 'btn btn-primary', text: 'Move money',
@@ -277,7 +277,7 @@
 
         var bal = el('input', { class: 'input input-amount' });
         root.CentInput.bind(bal, acc.startBalance || '');
-        body.appendChild(UI.field('Starting balance', bal, 'Open your bank app and enter what is actually in there right now.'));
+        body.appendChild(UI.field('Amount in it now', bal, 'Check your bank app and put in what is really there now.'));
 
         var actions = el('div', { class: 'row-actions' });
         if (!isNew) {
@@ -286,7 +286,7 @@
             onclick: function () {
               UI.confirm({
                 title: 'Delete ' + acc.name + '?',
-                message: 'This removes the account. Accounts with transactions cannot be deleted.',
+                message: 'This removes the account. You cannot delete one that still has transactions.',
                 confirmLabel: 'Delete account', danger: true
               }).then(function (ok) {
                 if (!ok) return;
@@ -345,10 +345,10 @@
 
         var amount = el('input', { class: 'input input-amount' });
         root.CentInput.bind(amount, currentAmount || '');
-        body.appendChild(UI.field('Amount each cycle', amount));
+        body.appendChild(UI.field('Amount each month', amount));
 
         var acc = UI.select(accountOptions(), item.accountId);
-        body.appendChild(UI.field('Account', acc, section === 'savings' ? 'Defaults to a saving account.' : null));
+        body.appendChild(UI.field('Account', acc, section === 'savings' ? 'Usually a savings account.' : null));
 
         var dueType = item.dueType || 'day';
         var dueDay = el('input', { class: 'input', type: 'number', min: '1', max: '31', value: item.dueDay || 1 });
@@ -366,14 +366,14 @@
         body.appendChild(UI.field(' ', dueHolder));
 
         var endMonth = el('input', { class: 'input', type: 'month', value: item.endMonth || '' });
-        body.appendChild(UI.field('Stops after', endMonth, 'Leave blank if it keeps going.'));
+        body.appendChild(UI.field('Stops after', endMonth, 'Leave empty if it keeps going.'));
 
         var applyMode = 'always';
         if (!isNew) {
           body.appendChild(UI.field('If the amount changed', UI.segmented(
-            [{ value: 'always', label: 'From now on' }, { value: 'cycle', label: 'Just this cycle' }],
+            [{ value: 'always', label: 'From now on' }, { value: 'cycle', label: 'Just this month' }],
             'always', function (v) { applyMode = v; }
-          ), hasLog ? 'This item is already ticked off this cycle — its logged amount updates too.' : null));
+          ), hasLog ? 'You already ticked this off this month, so its transaction changes too.' : null));
         }
 
         var actions = el('div', { class: 'row-actions' });
@@ -383,7 +383,7 @@
             onclick: function () {
               UI.confirm({
                 title: 'Delete ' + (item.name || 'this item') + '?',
-                message: 'Transactions already logged from it stay in your history.',
+                message: 'Anything you already logged from it stays in your history.',
                 confirmLabel: 'Delete', danger: true
               }).then(function (ok) {
                 if (!ok) return;

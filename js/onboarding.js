@@ -74,15 +74,15 @@
     var endLabel = C.dateLabel(range.endIso);
 
     body.appendChild(el('h3', { class: 'ob-title', text: 'You are starting part-way through' }));
-    body.appendChild(el('p', { class: 'ob-copy', text: 'This cycle runs to ' + endLabel + '. That is ' + days + ' day' + (days === 1 ? '' : 's') + ' left, counting today.' }));
-    body.appendChild(el('p', { class: 'ob-copy', text: 'Your Plan describes a whole cycle, and most of this one has already happened. So for this first cycle we go off what you actually have, not what the Plan says arrives.' }));
+    body.appendChild(el('p', { class: 'ob-copy', text: 'This month runs to ' + endLabel + '. That is ' + days + ' day' + (days === 1 ? '' : 's') + ' left, counting today.' }));
+    body.appendChild(el('p', { class: 'ob-copy', text: 'Your Plan is for a whole month, and most of this one is already gone. So for this first month we use what you really have, not what the Plan says.' }));
 
     var suggested = Math.max(0, Calc.suggestMidCycleRemaining(joinIso));
     var amount = el('input', { class: 'input input-amount' });
     root.CentInput.bind(amount, suggested || '');
-    body.appendChild(UI.field('Spending money left until ' + endLabel, amount));
+    body.appendChild(UI.field('Money left until ' + endLabel, amount));
 
-    body.appendChild(el('p', { class: 'ob-copy', text: 'We guessed ' + Fmt.money(suggested) + ' from your spending accounts. That treats every cent in them as yours to spend — take out any rent, bills or instalments you still have to pay before ' + endLabel + '.' }));
+    body.appendChild(el('p', { class: 'ob-copy', text: 'We guessed ' + Fmt.money(suggested) + ' from your spending accounts. That counts every cent as yours to spend — take out any rent, bills or instalments you still have to pay before ' + endLabel + '.' }));
 
     var rate = el('p', { class: 'ob-copy strong' });
     function paintRate() {
@@ -100,7 +100,7 @@
     }
 
     body.appendChild(el('button', {
-      class: 'btn btn-primary btn-block', text: 'Use this for the rest of the cycle',
+      class: 'btn btn-primary btn-block', text: 'Use this for the rest of the month',
       onclick: function () {
         done({
           midCycleMode: 'remaining',
@@ -111,23 +111,23 @@
       }
     }));
     body.appendChild(el('button', {
-      class: 'btn btn-ghost btn-block', text: 'I have already spent my share — use the normal rate',
+      class: 'btn btn-ghost btn-block', text: 'I already spent my share — use the normal amount',
       onclick: function () { done({ midCycleMode: 'prorate', midCycleAsked: true }); }
     }));
-    body.appendChild(el('p', { class: 'sheet-note', text: 'Either way you can change this later in Settings, under This cycle.' }));
+    body.appendChild(el('p', { class: 'sheet-note', text: 'You can change this later in Settings, under Your first month.' }));
   }
 
   /* Standalone version for Settings and for the once-only prompt at boot. */
   function openMidCycleSheet(opts) {
     opts = opts || {};
     return UI.sheet({
-      title: 'Your first cycle',
+      title: 'Your first month',
       render: function (body, api) {
         midCycleQuestion(body, {
           joinIso: opts.joinIso,
           onDone: function (spread) {
             api.close();
-            UI.toast(spread ? 'Daily budget spread over the rest of this cycle' : 'Using the normal monthly rate');
+            UI.toast(spread ? 'Daily budget set for the rest of the month' : 'Using the normal amount');
           }
         });
       }
@@ -161,15 +161,15 @@
 
       if (step === 0) {
         body.appendChild(el('h3', { class: 'ob-title', text: 'Two kinds of number' }));
-        body.appendChild(el('p', { class: 'ob-copy', text: 'Monthly Balance and Savings Balance show what you actually have — they are added up straight from your accounts.' }));
-        body.appendChild(el('p', { class: 'ob-copy', text: 'The daily budget on Home is a forecast built from your Plan. Different job, different number.' }));
-        body.appendChild(el('p', { class: 'ob-copy strong', text: 'Set up accounts first, Plan second. Skipping account setup is what makes those balances read zero later.' }));
+        body.appendChild(el('p', { class: 'ob-copy', text: 'Spending money and Savings show what you really have — added straight up from your accounts.' }));
+        body.appendChild(el('p', { class: 'ob-copy', text: 'The daily budget on Home is a guess based on your Plan. Different thing, different number.' }));
+        body.appendChild(el('p', { class: 'ob-copy strong', text: 'Do accounts first, then the Plan. Skip the accounts and those totals will show zero later.' }));
         next(body, api, 'Next: your money month');
       }
 
       if (step === 1) {
         body.appendChild(el('h3', { class: 'ob-title', text: 'When does your money month start?' }));
-        body.appendChild(el('p', { class: 'ob-copy', text: 'Payday, not the 1st, for most people. Set 25 if your month runs the 25th to the 24th. Every cycle figure in the app is measured from this day.' }));
+        body.appendChild(el('p', { class: 'ob-copy', text: 'Payday, not the 1st, for most people. Put 25 if your month runs 25th to 24th. Every figure in the app counts from this day.' }));
 
         var day = el('input', {
           class: 'input', type: 'number', min: '1', max: '31',
@@ -188,8 +188,8 @@
         }
         day.addEventListener('input', paintPreview);
         paintPreview();
-        body.appendChild(UI.field('Cycle starts on day', day,
-          'Pick 29, 30 or 31 and a month that is too short uses its last day — the same as a bank paying you early.'));
+        body.appendChild(UI.field('Money month starts on day', day,
+          'Pick 29, 30 or 31 and a short month uses its last day — same as the bank paying you early.'));
         body.appendChild(preview);
 
         body.appendChild(el('button', {
@@ -206,8 +206,8 @@
       if (step === 2) {
         var gens = Calc.accountsOfType('general');
         body.appendChild(el('h3', { class: 'ob-title', text: 'Add your main spending account' }));
-        body.appendChild(el('p', { class: 'ob-copy', text: 'Checking account, wallet, e-wallet — whatever you actually pay with day to day.' }));
-        body.appendChild(el('p', { class: 'ob-copy strong', text: 'Check your bank app right now and enter what is actually there. That figure becomes your Monthly Balance.' }));
+        body.appendChild(el('p', { class: 'ob-copy', text: 'Current account, wallet, e-wallet — whatever you actually pay with every day.' }));
+        body.appendChild(el('p', { class: 'ob-copy strong', text: 'Check your bank app now and put in what is really there. That becomes your spending money.' }));
         body.appendChild(existingList(gens));
         body.appendChild(el('button', {
           class: 'btn btn-primary btn-block', text: gens.length ? '+ Add another spending account' : '+ Add spending account',
@@ -222,7 +222,7 @@
       if (step === 3) {
         var savs = Calc.accountsOfType('saving');
         body.appendChild(el('h3', { class: 'ob-title', text: 'Keep savings separate?' }));
-        body.appendChild(el('p', { class: 'ob-copy', text: 'ASB, fixed deposit, digital bank, tabung — add it here and its balance becomes your Savings Balance straight away. Optional.' }));
+        body.appendChild(el('p', { class: 'ob-copy', text: 'ASB, fixed deposit, digital bank, tabung — put it here and it counts as savings. Optional.' }));
         body.appendChild(existingList(savs));
         body.appendChild(el('button', {
           class: 'btn btn-ghost btn-block', text: savs.length ? '+ Add another saving account' : '+ Add saving account',
@@ -230,7 +230,7 @@
             root.Forms.account(null, { type: 'saving', onSaved: function () { paint(body, api); } });
           }
         }));
-        next(body, api, midCycleApplies() ? 'Next: this cycle' : 'Next: your plan');
+        next(body, api, midCycleApplies() ? 'Next: this month' : 'Next: your plan');
       }
 
       if (step === 4) {
@@ -242,8 +242,8 @@
 
       if (step === 5) {
         body.appendChild(el('h3', { class: 'ob-title', text: 'Now set up your Plan' }));
-        body.appendChild(el('p', { class: 'ob-copy', text: 'Income, commitments and savings goals. Each one gets assigned to an account you just created.' }));
-        body.appendChild(el('p', { class: 'ob-copy', text: 'This powers the Daily Spending Budget forecast — separate from the account totals you just entered.' }));
+        body.appendChild(el('p', { class: 'ob-copy', text: 'Income, commitments and savings. Each one goes to an account you just added.' }));
+        body.appendChild(el('p', { class: 'ob-copy', text: 'This is what the daily budget is worked out from — separate from the account totals you just put in.' }));
         body.appendChild(el('div', { class: 'ob-summary' }, [
           summaryRow('Monthly Balance', Calc.monthlyBalance()),
           summaryRow('Savings Balance', Calc.savingsBalance())
@@ -286,7 +286,7 @@
         onclick: function () {
           UI.confirm({
             title: 'Skip account setup?',
-            message: 'Monthly Balance and Savings Balance will read zero until you add accounts with their real starting balances. You can restart this guide from Settings.',
+            message: 'Your totals will show zero until you add accounts with real amounts. You can run this guide again from Settings.',
             confirmLabel: 'Skip anyway'
           }).then(function (ok) { if (ok) { finish(); api.close(); } });
         }

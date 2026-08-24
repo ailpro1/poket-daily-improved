@@ -32,18 +32,18 @@
   }
 
   function coachLine(db, summary) {
-    if (!root.S.accounts.length) return 'Add your accounts first — Monthly Balance reads straight from them.';
+    if (!root.S.accounts.length) return 'Add your accounts first — the totals come straight from them.';
     /* Ahead of the no-Plan line: a mid-cycle joiner has a real budget from the
        figure they stated, even with an empty Plan. */
     if (db.midCycleJoinIso && !summary.plannedIncome) {
-      return 'Running on what you had left when you started. Set up your Plan for ' +
+      return 'Using what you had left when you started. Set up your Plan for ' +
         C.cycleLabel(C.shiftCycleKey(db.cycleKey, 1)) + ' onwards.';
     }
-    if (!summary.plannedIncome) return 'Set up your Plan to turn on the daily budget.';
-    if (db.carry < -0.5) return 'You are ' + Fmt.money(Math.abs(db.carry)) + ' behind your plan. Today\'s figure already absorbs it.';
-    if (db.carry > 0.5) return Fmt.money(db.carry) + ' rolled over from earlier days, so today has more room.';
-    if (db.left < 0) return 'Today is spent. Tomorrow starts ' + Fmt.money(Math.abs(db.left)) + ' down.';
-    return 'On plan. ' + db.daysLeft + ' day' + (db.daysLeft === 1 ? '' : 's') + ' left in this cycle.';
+    if (!summary.plannedIncome) return 'Set up your Plan to switch on the daily budget.';
+    if (db.carry < -0.5) return 'You are ' + Fmt.money(Math.abs(db.carry)) + ' short. Today\'s figure already takes that off.';
+    if (db.carry > 0.5) return Fmt.money(db.carry) + ' left over from before, so today has more room.';
+    if (db.left < 0) return 'Nothing left for today. Tomorrow starts ' + Fmt.money(Math.abs(db.left)) + ' short.';
+    return 'On track. ' + db.daysLeft + ' day' + (db.daysLeft === 1 ? '' : 's') + ' left this month.';
   }
 
   function balanceCard(opts) {
@@ -100,10 +100,89 @@
           ]));
         });
         list.appendChild(el('li', { class: 'mini-total' }, [
-          el('span', { text: isSaving ? 'Savings Balance' : 'Monthly Balance' }),
+          el('span', { text: isSaving ? 'Savings' : 'Spending money' }),
           el('b', { class: 'num', text: Fmt.money(isSaving ? Calc.savingsBalance() : Calc.monthlyBalance()) })
         ]));
         body.appendChild(list);
+      }
+    });
+  }
+
+  /* Tapping the hero opens the next three days, each split into the two parts
+     it is made of: what rolled over from the day before, plus that day's own
+     share. Tomorrow and the day after assume nothing more is spent today —
+     said out loud at the bottom, because it is a real assumption. */
+  function forecastSheet() {
+    var days = Calc.forecastDays(3);
+    var names = ['Today', 'Tomorrow'];
+
+    function dayName(p) {
+      if (names[p.offset]) return names[p.offset];
+      var d = C.toDate(p.iso);
+      return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()] + ' ' + d.getDate();
+    }
+
+    UI.sheet({
+      title: 'Today and the next 2 days',
+      render: function (body) {
+        var holder = el('div', {
+          class: 'chart-holder',
+          html: root.Charts.forecast(days.map(function (p) {
+            return { value: p.left, label: dayName(p) + ': ' + Fmt.money(p.left), short: dayName(p) };
+          }))
+        });
+        body.appendChild(holder);
+
+        var grid = el('div', { class: 'fc-grid' });
+        var dots = UI.$$('.fc-dot', holder);
+        var cards = [];
+        var picked = 0;
+
+        function paint() {
+          dots.forEach(function (d, i) { d.classList.toggle('on', i === picked); });
+          cards.forEach(function (c, i) {
+            c.classList.toggle('on', i === picked);
+            c.setAttribute('aria-pressed', i === picked ? 'true' : 'false');
+          });
+        }
+        function pick(i) { picked = i; paint(); }
+
+        days.forEach(function (p, i) {
+          var card = el('div', {
+            class: 'fc-card', tabindex: '0', role: 'button', 'aria-pressed': 'false',
+            onclick: function () { pick(i); },
+            onkeydown: function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(i); } }
+          }, [
+            el('span', { class: 'fc-day', text: dayName(p) }),
+            el('b', { class: 'fc-big num' + (p.left < 0 ? ' neg' : ''), text: Fmt.money(p.left) }),
+            el('span', { class: 'fc-part' }, [
+              document.createTextNode('Left over'),
+              el('b', { class: 'num', text: Fmt.money(p.rollover) })
+            ]),
+            el('span', { class: 'fc-part' }, [
+              document.createTextNode('For the day'),
+              el('b', { class: 'num', text: '+ ' + Fmt.money(p.allowance) })
+            ])
+          ]);
+          if (p.offset === 0 && p.spent > 0.005) {
+            card.appendChild(el('span', { class: 'fc-sum', text: 'Spent so far ' + Fmt.money(p.spent) }));
+          } else if (p.projected) {
+            card.appendChild(el('span', { class: 'fc-sum', text: 'If you stop now' }));
+          }
+          cards.push(card);
+          grid.appendChild(card);
+        });
+        body.appendChild(grid);
+
+        dots.forEach(function (d, i) {
+          d.addEventListener('click', function () { pick(i); });
+          d.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(i); }
+          });
+        });
+        paint();
+
+        body.appendChild(el('p', { class: 'sheet-note', text: 'Each day gets ' + Fmt.money(days[0].allowance) + '. Whatever you do not spend rolls over to the next day, so tomorrow and the day after assume you stop spending now.' }));
       }
     });
   }
@@ -114,16 +193,21 @@
     var summary = Calc.cycleSummary(cycleKey);
     host.innerHTML = '';
 
-    var hero = el('section', { class: 'hero' + (db.left < 0 ? ' hero-over' : '') }, [
-      el('span', { class: 'eyebrow', text: 'Safe to spend today · forecast' }),
+    var hero = el('section', {
+      class: 'hero tappable' + (db.left < 0 ? ' hero-over' : ''),
+      tabindex: '0', role: 'button', 'aria-label': 'Today and the next 2 days',
+      onclick: forecastSheet,
+      onkeydown: function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); forecastSheet(); } }
+    }, [
+      el('span', { class: 'eyebrow', text: 'You can spend today' }),
       el('p', { class: 'hero-value', text: Fmt.money(db.left) }),
-      el('p', { class: 'hero-sub', text: Fmt.money(db.allowance) + ' a day' + (Math.abs(db.carry) > 0.005 ? (db.carry > 0 ? '  +' : '  −') + Fmt.money(Math.abs(db.carry)) + ' carried over' : '') })
+      el('p', { class: 'hero-sub', text: Fmt.money(db.allowance) + ' a day' + (Math.abs(db.carry) > 0.005 ? (db.carry > 0 ? '  +' : '  −') + Fmt.money(Math.abs(db.carry)) + ' left over' : '') })
     ]);
     var strip = el('div', { class: 'strip-holder', html: root.Charts.dayStrip(dayStripData(cycleKey)) });
     hero.appendChild(strip);
     hero.appendChild(el('div', { class: 'hero-foot' }, [
-      el('span', { text: C.cycleLabel(cycleKey) }),
-      el('span', { text: db.daysLeft + ' of ' + db.totalDays + ' days left' })
+      el('span', { text: db.daysLeft + ' of ' + db.totalDays + ' days left' }),
+      el('span', { text: 'Tap for the next 2 days ›' })
     ]));
     host.appendChild(hero);
 
@@ -143,13 +227,13 @@
 
     var cards = el('div', { class: 'bal-grid' }, [
       balanceCard({
-        cls: 'bal-general', eyebrow: 'Monthly Balance · actual',
+        cls: 'bal-general', eyebrow: 'Spending money',
         value: Calc.monthlyBalance(),
         sub: Calc.accountsOfType('general').length + ' spending account' + (Calc.accountsOfType('general').length === 1 ? '' : 's'),
         onclick: function () { graphSheet('general'); }
       }),
       balanceCard({
-        cls: 'bal-saving', eyebrow: 'Savings Balance · actual',
+        cls: 'bal-saving', eyebrow: 'Savings',
         value: Calc.savingsBalance(),
         sub: Calc.accountsOfType('saving').length + ' saving account' + (Calc.accountsOfType('saving').length === 1 ? '' : 's'),
         onclick: function () { graphSheet('saving'); }
@@ -158,17 +242,17 @@
     host.appendChild(cards);
 
     var pool = el('section', { class: 'card' }, [
-      el('span', { class: 'eyebrow', text: 'This cycle, planned' }),
+      el('span', { class: 'eyebrow', text: 'This month\'s plan' }),
       el('ul', { class: 'kv' }, [
         row('Income', summary.plannedIncome),
         row('Commitments', -summary.plannedCommitments),
         row('Savings', -summary.plannedSavings),
-        row('Left to live on', summary.pool, true)
+        row('Left to spend', summary.pool, true)
       ]),
       el('div', { class: 'kv-split' }),
       el('ul', { class: 'kv' }, [
-        row('Spent so far (all logged)', -summary.actualSpent),
-        row('Of that, ticked off Plan', -summary.checklistSpent)
+        row('Spent so far', -summary.actualSpent),
+        row('Of that, from the Plan', -summary.checklistSpent)
       ])
     ]);
     host.appendChild(pool);

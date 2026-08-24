@@ -12,7 +12,7 @@
         var holder = el('div');
         body.appendChild(holder);
         paint(holder, cycleKey);
-        body.appendChild(el('p', { class: 'sheet-note', text: 'Ticking an item logs the real transaction against its account. Unticking removes that log again.' }));
+        body.appendChild(el('p', { class: 'sheet-note', text: 'Ticking an item logs the real transaction on its account. Untick it and that transaction is removed.' }));
       }
     });
   }
