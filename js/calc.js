@@ -76,6 +76,29 @@
      equals the two balances added up. */
   function netWorth(uptoIso) { return R(monthlyBalance(uptoIso) + savingsBalance(uptoIso)); }
 
+  /* How much the total has moved during this money month, and the split
+     between spending and savings. Neither figure repeats what the account
+     groups below already show. */
+  function netWorthSummary(cycleKey) {
+    var r = C.getCycleRangeForKey(cycleKey || C.currentCycleKey());
+    var startedIso = C.iso(C.addDays(r.start, -1));   /* close of the day before */
+    var spend = monthlyBalance();
+    var saved = savingsBalance();
+    var total = R(spend + saved);
+    var span = Math.abs(spend) + Math.abs(saved);
+    return {
+      total: total,
+      spending: spend,
+      savings: saved,
+      /* Shares are of the absolute split, so an overdrawn account cannot
+         push a bar past 100% or flip it negative. */
+      spendingShare: span ? Math.abs(spend) / span : 0,
+      savingsShare: span ? Math.abs(saved) / span : 0,
+      change: R(total - netWorth(startedIso)),
+      sinceIso: r.startIso
+    };
+  }
+
   /* ---------- plan (spec 4) --------------------------------------------- */
 
   function planSections() { return ['income', 'commitments', 'savings']; }
@@ -441,6 +464,34 @@
     };
   }
 
+  /* ---------- the next few days ------------------------------------------
+     Today plus the days after it, each broken into the two parts it is made
+     of: what rolled over from the day before, and that day's own share.
+
+     Future days assume nothing more is spent today — there is no honest way
+     to guess otherwise, so the UI has to say so. carryInto() already handles
+     it: for tomorrow the walk includes today, so today's unspent remainder
+     becomes tomorrow's roll-over on its own. */
+  function forecastDays(count, fromIso) {
+    var start = fromIso || C.iso(C.today());
+    var out = [];
+    for (var i = 0; i < (count || 3); i++) {
+      var iso = C.iso(C.addDays(start, i));
+      var db = dailyBudget(iso);
+      out.push({
+        iso: iso,
+        offset: i,
+        rollover: db.carry,          /* left over from the day before */
+        allowance: db.allowance,     /* this day's own share */
+        budget: db.budget,           /* rollover + allowance */
+        spent: i === 0 ? db.spentToday : 0,
+        left: i === 0 ? db.left : db.budget,
+        projected: i > 0
+      });
+    }
+    return out;
+  }
+
   /* ---------- cycle roll-up used by Home + Log tabs ---------------------- */
 
   function cycleSummary(cycleKey) {
@@ -561,6 +612,7 @@
     monthlyBalance: monthlyBalance,
     savingsBalance: savingsBalance,
     netWorth: netWorth,
+    netWorthSummary: netWorthSummary,
     planSections: planSections,
     planItems: planItems,
     planItemsSorted: planItemsSorted,
@@ -584,6 +636,7 @@
     carryMode: carryMode,
     carryInto: carryInto,
     dailyBudget: dailyBudget,
+    forecastDays: forecastDays,
     cycleSummary: cycleSummary,
     logsInRange: logsInRange,
     categoryTotals: categoryTotals,

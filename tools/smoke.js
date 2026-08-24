@@ -103,12 +103,21 @@ const eq = (label, a, b) => check(label, Math.abs(a - b) < 0.02, 'got=' + a + ' 
   const savCards = [...groups[1].querySelectorAll('.acc-bal')].map(n => money(n.textContent));
   eq('sum of spending cards === Monthly Balance', genCards.reduce((a, b) => a + b, 0), Calc.monthlyBalance());
   eq('sum of saving cards === Savings Balance', savCards.reduce((a, b) => a + b, 0), Calc.savingsBalance());
-  eq('Net Worth card === both balances added up', money(txt('.net-worth')),
+  eq('the total card === both balances added up', money(txt('.net-worth')),
     Calc.monthlyBalance() + Calc.savingsBalance());
   eq('and Calc.netWorth agrees with the card', Calc.netWorth(), money(txt('.net-worth')));
-  check('Net Worth leads the Accounts tab',
-    w.document.querySelector('#app-main .card .eyebrow').textContent === 'Net Worth · actual',
+  check('the total leads the Accounts tab',
+    w.document.querySelector('#app-main .card .eyebrow').textContent === 'Total money',
     txt('#app-main .card .eyebrow'));
+  /* The two group totals are printed next to their own headings below, so the
+     card must not repeat them. */
+  const netCardTxt = w.document.querySelector('.net-card').textContent;
+  check('the total card no longer repeats the two group balances',
+    !/Spending money|Savings/.test(netCardTxt), netCardTxt.slice(0, 70));
+  const nws = Calc.netWorthSummary(cycle);
+  check('it shows the split as a bar instead',
+    !!w.document.querySelector('.net-bar-spend') && !!w.document.querySelector('.net-bar-save'));
+  eq('the two shares add up to the whole bar', nws.spendingShare + nws.savingsShare, 1);
   check('section titles carry a count',
     groups[0].querySelector('.eyebrow').textContent === 'Accounts (2)' &&
     groups[1].querySelector('.eyebrow').textContent === 'Saving Accounts (1)',
@@ -118,10 +127,10 @@ const eq = (label, a, b) => check(label, Math.abs(a - b) < 0.02, 'got=' + a + ' 
   await wait(60);
   const stats = [...w.document.querySelectorAll('.stat-value')].map(n => money(n.textContent));
   const cs = Calc.cycleSummary(cycle);
-  eq('Log tab: in this cycle', stats[0], cs.actualIncome);
-  eq('Log tab: out this cycle', stats[1], cs.actualSpent);
+  eq('Log tab: money in', stats[0], cs.actualIncome);
+  eq('Log tab: money out', stats[1], cs.actualSpent);
   check('Log tab shows the cycle in-and-out only, no live balances',
-    stats.length === 2 && !/Monthly Balance|Savings Balance/.test(txt('#app-main')),
+    stats.length === 2 && !/Spending money|Savings Balance/.test(txt('#app-main')),
     stats.length + ' stats');
   check('transfers are listed as a pair', S.logs.filter(l => l.transferPairId).length === 4);
 
@@ -148,8 +157,8 @@ const eq = (label, a, b) => check(label, Math.abs(a - b) < 0.02, 'got=' + a + ' 
   check('committed excludes planned income',
     !pb.items.some(i => i.section === 'income') && !/Salary/.test(txt('#app-main')));
   check('each committed row says which half it came from and whether it is paid',
-    /Commitment · \d+% · ticked off/.test(txt('#app-main')) &&
-    /Savings · \d+% · ticked off/.test(txt('#app-main')));
+    /Commitment · \d+% · paid/.test(txt('#app-main')) &&
+    /Savings · \d+% · paid/.test(txt('#app-main')));
 
   /* A second income source, so Money in has more than one slice to pick
      between — and one hand-logged item alongside the planned salary. */

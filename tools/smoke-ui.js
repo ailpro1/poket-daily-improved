@@ -94,7 +94,7 @@ w.addEventListener('error', e => errors.push(e.message));
 
   // the mid-cycle step — reached because the cycle start day above guarantees it
   byText('.btn', 'Next: savings').click(); await wait();
-  byText('.btn', 'Next: this cycle').click(); await wait();
+  byText('.btn', 'Next: this month').click(); await wait();
   check('guide asks about starting part-way through the cycle',
     /starting part-way through/.test(sheet().textContent));
   const midAmount = q('.input-amount');
@@ -104,8 +104,8 @@ w.addEventListener('error', e => errors.push(e.message));
   check('mid-cycle step shows the resulting daily rate',
     sheet().textContent.indexOf(w.Fmt.money(2500 / midDays) + ' a day') > -1,
     w.Fmt.money(2500 / midDays) + ' a day over ' + midDays + ' days');
-  byText('.btn', 'Use this for the rest of the cycle').click(); await wait(200);
-  check('stated figure saved as the rule for this cycle',
+  byText('.btn', 'Use this for the rest of the month').click(); await wait(200);
+  check('stated figure saved as the rule for this month',
     w.S.settings.midCycleMode === 'remaining' && w.S.settings.midCycleRemaining === 2500,
     w.S.settings.midCycleMode + ' / ' + w.S.settings.midCycleRemaining);
   check('daily allowance is now the stated figure over the days left',
@@ -154,16 +154,16 @@ w.addEventListener('error', e => errors.push(e.message));
 
   // account detail + settings
   w.TabAccounts.detail(w.S.accounts[0].id); await wait();
-  check('account detail shows its balance', /Balance now/.test(sheet().textContent));
+  check('account detail shows its balance', /In here now/.test(sheet().textContent));
   w.Settings.open(); await wait();
   check('settings offers backup and restore', /Download full backup/.test(sheet().textContent) && /Restore from backup/.test(sheet().textContent));
   check('settings can reorder the tabs', !!sheet().querySelector('.order-list'));
   // the mid-cycle rule set during onboarding must be correctable here
-  check('settings exposes the This cycle controls', /This cycle/.test(sheet().textContent) &&
-    /Spread what I had left/.test(sheet().textContent));
+  check('settings exposes the first-month controls', /Your first month/.test(sheet().textContent) &&
+    /Use what I had left/.test(sheet().textContent));
   check('and shows the current spread rate', /a day across \d+ day/.test(sheet().textContent),
     (sheet().textContent.match(/[^.]*a day across[^.]*\./) || [''])[0].trim());
-  byText('.seg', 'Normal monthly rate').click(); await wait();
+  byText('.seg', 'Use the normal amount').click(); await wait();
   byText('.btn', 'Save settings').click(); await wait(200);
   check('switching back to the monthly rate clears the spread',
     w.S.settings.midCycleMode === 'prorate', w.S.settings.midCycleMode);
@@ -228,14 +228,16 @@ w.addEventListener('error', e => errors.push(e.message));
     w.Onboarding.midCyclePending() === false);
   await w.Actions.saveSettings({ midCycleAsked: true, midCycleJoinDate: null });
 
+  const esc2 = () => D.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape' }));
+
   // refund a logged transaction from its edit sheet
   const spendLog = w.S.logs.filter(l => !l.transferPairId && !l.sourceChecklistId && l.type === 'expense')[0];
   const accBefore = w.Calc.monthlyBalance();
   w.Forms.transaction(spendLog); await wait();
-  check('the edit sheet offers a refund', !!byText('.btn', 'Refund or reimburse'));
-  byText('.btn', 'Refund or reimburse').click(); await wait();
+  check('the edit sheet offers a refund', !!byText('.btn', 'Got money back'));
+  byText('.btn', 'Got money back').click(); await wait();
   check('the refund sheet opens',
-    /Refund or reimburse/.test(sheet().querySelector('.sheet-title').textContent),
+    /Got money back/.test(sheet().querySelector('.sheet-title').textContent),
     sheet().querySelector('.sheet-title').textContent);
   check('and prefills the whole amount',
     w.CentInput.value(q('.input-amount')) === Math.abs(spendLog.amount),
@@ -266,8 +268,8 @@ w.addEventListener('error', e => errors.push(e.message));
   const planLog = w.S.logs.filter(l => l.sourceChecklistId && l.type === 'expense')[0];
   check('there is a Plan-sourced expense to reimburse', !!planLog);
   w.Forms.transaction(planLog); await wait();
-  check('a Plan-sourced transaction offers it too', !!byText('.btn', 'Refund or reimburse'));
-  byText('.btn', 'Refund or reimburse').click(); await wait();
+  check('a Plan-sourced transaction offers it too', !!byText('.btn', 'Got money back'));
+  byText('.btn', 'Got money back').click(); await wait();
   byText('.btn', 'Log the refund').click(); await wait(250);
   const rf2 = w.S.logs.filter(l => l.refundOfLogId === planLog.id)[0];
   check('the reimbursement is written as plain income', !!rf2 && !rf2.sourceChecklistId && rf2.type === 'income');
@@ -290,10 +292,45 @@ w.addEventListener('error', e => errors.push(e.message));
   }
   w.App.go('accounts'); await wait();
   check('the Accounts card no longer carries the explanation',
-    !/live sum of the cards below/.test(D.querySelector('#app-main').textContent));
+    !/added together. The arrow shows/.test(D.querySelector('#app-main').textContent));
   w.App.go('breakdown'); await wait();
   check('the Breakdown chart card no longer carries its paragraph',
-    !/the same rule the daily budget uses/.test(D.querySelector('#app-main').textContent));
+    !/same rule, so the totals always agree/.test(D.querySelector('#app-main').textContent));
+
+  // tapping the Home hero opens today and the next 2 days
+  w.App.go('home'); await wait();
+  const heroEl = D.querySelector('.hero');
+  check('the hero is tappable', heroEl.getAttribute('role') === 'button', heroEl.getAttribute('role'));
+  heroEl.click(); await wait(250);
+  check('it opens the 3-day view',
+    /Today and the next 2 days/.test(sheet().querySelector('.sheet-title').textContent),
+    sheet().querySelector('.sheet-title').textContent);
+  const fcCards = qq('.fc-card');
+  const fcDots = qq('.fc-dot');
+  check('one card per day', fcCards.length === 3, fcCards.length);
+  check('one chart dot per day', fcDots.length === 3, fcDots.length);
+  check('they are named Today, Tomorrow and the day after',
+    qq('.fc-day').map(n => n.textContent).slice(0, 2).join(',') === 'Today,Tomorrow',
+    qq('.fc-day').map(n => n.textContent).join(','));
+  check('today starts selected', fcCards[0].classList.contains('on'));
+  check('each day shows what rolled over and its own share',
+    fcCards.every(c => /Left over/.test(c.textContent) && /For the day/.test(c.textContent)));
+  check('the future days say they assume you stop now',
+    /If you stop now/.test(fcCards[1].textContent) && /If you stop now/.test(fcCards[2].textContent));
+  const fdays = w.Calc.forecastDays(3);
+  check('budget is rollover plus the daily share, every day',
+    fdays.every(p => Math.abs(p.budget - (p.rollover + p.allowance)) < 0.02),
+    fdays.map(p => p.rollover.toFixed(2) + '+' + p.allowance.toFixed(2) + '=' + p.budget.toFixed(2)).join(' | '));
+  check("tomorrow's roll-over is today's leftover",
+    Math.abs(fdays[1].rollover - fdays[0].left) < 0.02,
+    fdays[1].rollover + ' vs ' + fdays[0].left);
+  fcDots[2].dispatchEvent(new w.MouseEvent('click', { bubbles: true })); await wait(60);
+  check('tapping a dot selects that day',
+    fcCards[2].classList.contains('on') && !fcCards[0].classList.contains('on'));
+  fcCards[1].click(); await wait(60);
+  check('tapping a card selects its dot',
+    fcDots[1].classList.contains('on') && !fcDots[2].classList.contains('on'));
+  esc2(); await wait(300);
 
   /* The headline cards are plain boxes. The jade left edge went through a
      border and then an inset bar before being dropped entirely — keep all
