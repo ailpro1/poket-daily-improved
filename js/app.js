@@ -59,7 +59,9 @@
         ['Labels on a row',
           '"from Plan" means you ticked it off the checklist. "split daily" means it is shared over the days left instead of all on one day. "refund" means money that came back.'],
         ['Getting money back',
-          'Tap any transaction and choose Got money back. It goes in as money in, so the spending cancels out and your account goes back up.']
+          'Tap any transaction and choose Got money back. It goes in as money in, so the spending cancels out and your account goes back up.'],
+        ['Changing categories',
+          'Open the Category box on any transaction and pick Edit categories, or go to Settings. Renaming one also renames it on your past transactions. Deleting one asks where to move them, so nothing is lost.']
       ]
     },
     plan: {

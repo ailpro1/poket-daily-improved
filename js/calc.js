@@ -544,7 +544,7 @@
       var amt = attributedInRange(l, fromIso, toIso);
       if (!amt) return;
       var key = l.categoryId || 'uncategorised';
-      var name = l.categoryName || 'Uncategorised';
+      var name = l.categoryName || 'No category';
       if (!map[key]) map[key] = { id: key, name: name, amount: 0, count: 0 };
       map[key].amount += amt;
       map[key].count += 1;

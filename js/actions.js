@@ -120,6 +120,64 @@
     return root.DB.putMany('logs', [out, inn]).then(commit);
   }
 
+  /* ---------- categories --------------------------------------------------
+     Each log keeps its OWN copy of categoryName, and that copy is what the
+     Breakdown and the Log rows display. So renaming a category has to
+     back-fill every log using it, or the old name goes on showing forever.
+     Deleting has to reassign them too, rather than leaving a dangling id. */
+
+  function categoryList(kind) {
+    var cats = root.S.settings.categories || {};
+    return (cats[kind] || []).slice();
+  }
+
+  function logsUsingCategory(id) {
+    return root.S.logs.filter(function (l) { return l.categoryId === id; });
+  }
+
+  function addCategory(kind, name) {
+    var cats = root.S.settings.categories || (root.S.settings.categories = { income: [], expense: [] });
+    if (!cats[kind]) cats[kind] = [];
+    var cat = { id: root.Fmt.uid('cat'), name: String(name || '').trim() };
+    if (!cat.name) return Promise.resolve(null);
+    cats[kind].push(cat);
+    return saveSettings({ categories: cats }).then(function () { return cat; });
+  }
+
+  function renameCategory(kind, id, name) {
+    var clean = String(name || '').trim();
+    if (!clean) return Promise.resolve(null);
+    var cats = root.S.settings.categories || {};
+    var cat = (cats[kind] || []).filter(function (c) { return c.id === id; })[0];
+    if (!cat) return Promise.resolve(null);
+    cat.name = clean;
+    /* Carry the new name onto the transactions that already point at it. */
+    var touched = logsUsingCategory(id);
+    touched.forEach(function (l) { l.categoryName = clean; });
+    return saveSettings({ categories: cats })
+      .then(function () { return root.DB.putMany('logs', touched); })
+      .then(function () { commit(); return cat; });
+  }
+
+  /* moveToId of null means "no category" — the logs keep existing, they just
+     stop pointing anywhere. Never leave them pointing at a deleted id. */
+  function deleteCategory(kind, id, moveToId) {
+    var cats = root.S.settings.categories || {};
+    if (!cats[kind]) return Promise.resolve();
+    cats[kind] = cats[kind].filter(function (c) { return c.id !== id; });
+    var target = moveToId
+      ? (cats[kind] || []).filter(function (c) { return c.id === moveToId; })[0]
+      : null;
+    var touched = logsUsingCategory(id);
+    touched.forEach(function (l) {
+      l.categoryId = target ? target.id : null;
+      l.categoryName = target ? target.name : null;
+    });
+    return saveSettings({ categories: cats })
+      .then(function () { return root.DB.putMany('logs', touched); })
+      .then(function () { commit(); return touched.length; });
+  }
+
   /* ---------- refunds and reimbursements ---------------------------------
      Money coming back on something already logged. It is a plain income log,
      which is the whole trick: budgetDrainOnDay() nets income off the day's
@@ -289,6 +347,11 @@
     deleteLog: deleteLog,
     undoDelete: undoDelete,
     addTransfer: addTransfer,
+    categoryList: categoryList,
+    logsUsingCategory: logsUsingCategory,
+    addCategory: addCategory,
+    renameCategory: renameCategory,
+    deleteCategory: deleteCategory,
     addRefund: addRefund,
     refundsFor: refundsFor,
     refundedTotal: refundedTotal,

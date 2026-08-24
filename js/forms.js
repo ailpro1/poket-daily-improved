@@ -15,14 +15,145 @@
   function categoryOptions(kind) {
     var cats = (root.S.settings.categories && root.S.settings.categories[kind]) || [];
     return cats.map(function (c) { return { value: c.id, label: c.name }; })
-      .concat([{ value: '__new', label: '+ New category' }]);
+      .concat([
+        { value: '__new', label: '+ New category' },
+        { value: '__manage', label: '✎ Edit categories' }
+      ]);
   }
 
-  function addCategory(kind, name) {
-    var cat = { id: Fmt.uid('cat'), name: name };
-    root.S.settings.categories[kind].push(cat);
-    root.Actions.saveSettings({ categories: root.S.settings.categories });
-    return cat;
+  var KIND_LABEL = { expense: 'Money out', income: 'Money in' };
+
+  /* ---------- managing categories ----------------------------------------
+     Rename and delete both have to touch the transactions using a category,
+     not just the settings list — see Actions.renameCategory. Reached from the
+     Category field on a transaction and from Settings. */
+  function categories(opts) {
+    opts = opts || {};
+    UI.sheet({
+      title: 'Categories',
+      onClose: function () { if (opts.onDone) opts.onDone(); },
+      render: function (body) {
+        var holder = el('div');
+        body.appendChild(holder);
+        paint();
+
+        function paint() {
+          holder.innerHTML = '';
+          ['expense', 'income'].forEach(function (kind) {
+            var list = root.Actions.categoryList(kind);
+            var sec = el('section', { class: 'card' });
+            sec.appendChild(el('span', { class: 'eyebrow', text: KIND_LABEL[kind] + ' (' + list.length + ')' }));
+            if (!list.length) {
+              sec.appendChild(el('p', { class: 'card-note', text: 'None yet.' }));
+            } else {
+              var ul = el('ul', { class: 'cat-manage' });
+              list.forEach(function (c) {
+                var used = root.Actions.logsUsingCategory(c.id).length;
+                ul.appendChild(el('li', {}, [
+                  el('span', { class: 'cat-manage-main' }, [
+                    el('span', { class: 'cat-name', text: c.name }),
+                    el('span', { class: 'log-meta', text: used ? 'used ' + used + ' time' + (used === 1 ? '' : 's') : 'not used yet' })
+                  ]),
+                  el('button', {
+                    class: 'icon-btn', text: '✎', 'aria-label': 'Rename ' + c.name,
+                    onclick: function () { rename(kind, c, paint); }
+                  }),
+                  el('button', {
+                    class: 'icon-btn', text: '🗑', 'aria-label': 'Delete ' + c.name,
+                    onclick: function () { remove(kind, c, used, paint); }
+                  })
+                ]));
+              });
+              sec.appendChild(ul);
+            }
+            sec.appendChild(el('button', {
+              class: 'btn btn-ghost btn-block btn-sm', text: '+ Add a ' + KIND_LABEL[kind].toLowerCase() + ' category',
+              onclick: function () { create(kind, paint); }
+            }));
+            holder.appendChild(sec);
+          });
+        }
+      }
+    });
+  }
+
+  function nameSheet(title, value, label, onSave) {
+    UI.sheet({
+      title: title,
+      render: function (body, s) {
+        var input = el('input', { class: 'input', type: 'text', value: value || '', placeholder: 'Food, Petrol, Bonus…' });
+        body.appendChild(UI.field(label, input));
+        body.appendChild(el('div', { class: 'row-actions' }, [
+          el('button', {
+            class: 'btn btn-primary', text: 'Save',
+            onclick: function () {
+              var v = input.value.trim();
+              if (!v) { UI.toast('Give it a name', { tone: 'warn' }); input.focus(); return; }
+              s.close();
+              onSave(v);
+            }
+          })
+        ]));
+        setTimeout(function () { input.focus(); }, 120);
+      }
+    });
+  }
+
+  function create(kind, done) {
+    nameSheet('New category', '', 'Name', function (name) {
+      root.Actions.addCategory(kind, name).then(function () { done(); UI.toast('Category added'); });
+    });
+  }
+
+  function rename(kind, cat, done) {
+    nameSheet('Rename ' + cat.name, cat.name, 'Name', function (name) {
+      root.Actions.renameCategory(kind, cat.id, name).then(function () {
+        done();
+        UI.toast('Renamed — your past transactions updated too');
+      });
+    });
+  }
+
+  /* A category in use cannot just vanish: those transactions would point at
+     nothing. Ask where they should go instead. */
+  function remove(kind, cat, used, done) {
+    if (!used) {
+      UI.confirm({
+        title: 'Delete ' + cat.name + '?',
+        message: 'Nothing is using it, so nothing else changes.',
+        confirmLabel: 'Delete', danger: true
+      }).then(function (ok) {
+        if (!ok) return;
+        root.Actions.deleteCategory(kind, cat.id, null).then(function () { done(); UI.toast('Category deleted'); });
+      });
+      return;
+    }
+    UI.sheet({
+      title: 'Delete ' + cat.name + '?',
+      render: function (body, s) {
+        body.appendChild(el('p', { class: 'sheet-note', text: used + ' transaction' + (used === 1 ? '' : 's') + ' use this category. They stay in your history — pick where to put them.' }));
+        var options = [{ value: '', label: 'No category' }].concat(
+          root.Actions.categoryList(kind)
+            .filter(function (c) { return c.id !== cat.id; })
+            .map(function (c) { return { value: c.id, label: c.name }; })
+        );
+        var pick = UI.select(options, '');
+        body.appendChild(UI.field('Move them to', pick));
+        body.appendChild(el('div', { class: 'row-actions' }, [
+          el('button', {
+            class: 'btn btn-danger', text: 'Delete category',
+            onclick: function () {
+              var to = pick.value || null;
+              s.close();
+              root.Actions.deleteCategory(kind, cat.id, to).then(function (n) {
+                done();
+                UI.toast('Deleted — ' + n + ' transaction' + (n === 1 ? '' : 's') + ' moved');
+              });
+            }
+          })
+        ]));
+      }
+    });
   }
 
   function dateInput(value) {
@@ -71,14 +202,23 @@
         }
         rebuildCats();
         catSel.addEventListener('change', function () {
+          if (catSel.value === '__manage') {
+            catSel.value = log.categoryId || '';
+            categories({ onDone: function () { catSel.innerHTML = ''; rebuildCats(); } });
+            return;
+          }
           if (catSel.value !== '__new') return;
-          var nm = prompt('New category name');
-          if (nm && nm.trim()) {
-            var cat = addCategory(kind, nm.trim());
-            catSel.innerHTML = ''; log.categoryId = cat.id; rebuildCats();
-          } else { catSel.value = log.categoryId || ''; }
+          catSel.value = log.categoryId || '';
+          nameSheet('New category', '', 'Name', function (nm) {
+            root.Actions.addCategory(kind, nm).then(function (cat) {
+              if (!cat) return;
+              log.categoryId = cat.id;
+              catSel.innerHTML = '';
+              rebuildCats();
+            });
+          });
         });
-        body.appendChild(UI.field('Category', catSel));
+        body.appendChild(UI.field('Category', catSel, 'Pick Edit categories to rename or delete one.'));
 
         var acc = UI.select(accountOptions(), log.accountId);
         body.appendChild(UI.field('Account', acc, locked ? 'This came from your Plan — change it there.' : null));
@@ -127,10 +267,10 @@
               spreadType: spread,
               date: date.value,
               accountId: acc.value,
-              categoryId: catSel.value === '__new' ? null : catSel.value || null,
+              categoryId: (catSel.value === '__new' || catSel.value === '__manage') ? null : catSel.value || null,
               categoryName: (function () {
                 var o = catSel.options[catSel.selectedIndex];
-                return o && o.value !== '__new' ? o.textContent : null;
+                return o && o.value !== '__new' && o.value !== '__manage' ? o.textContent : null;
               })()
             };
             var p = isNew ? root.Actions.addLog(patch) : root.Actions.updateLog(log.id, patch);
@@ -424,6 +564,7 @@
   root.Forms = {
     ICONS: ICONS,
     transaction: transaction,
+    categories: categories,
     refund: refund,
     transfer: transfer,
     account: account,

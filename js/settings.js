@@ -248,6 +248,12 @@
         body.appendChild(orderList);
 
         body.appendChild(el('div', { class: 'kv-split' }));
+        body.appendChild(el('button', {
+          class: 'btn btn-ghost btn-block', text: 'Edit categories',
+          onclick: function () { root.Forms.categories(); }
+        }));
+
+        body.appendChild(el('div', { class: 'kv-split' }));
         body.appendChild(el('span', { class: 'eyebrow', text: 'Your data' }));
         body.appendChild(el('button', { class: 'btn btn-ghost btn-block', text: 'Download full backup (JSON)', onclick: exportJson }));
         body.appendChild(el('button', { class: 'btn btn-ghost btn-block', text: 'Export Plan as CSV', onclick: exportPlanCsv }));
