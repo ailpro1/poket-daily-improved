@@ -118,6 +118,26 @@ const eq = (label, a, b) => check(label, Math.abs(a - b) < 0.02, 'got=' + a + ' 
   check('it shows the split as a bar instead',
     !!w.document.querySelector('.net-bar-spend') && !!w.document.querySelector('.net-bar-save'));
   eq('the two shares add up to the whole bar', nws.spendingShare + nws.savingsShare, 1);
+
+  /* Plan's version of the same widget: commitments vs savings, of the two
+     combined — not of income, since income can be zero or smaller than the
+     commitments+savings total (an overcommitted Plan), and either would
+     overflow or divide by zero on a share-of-income bar. */
+  w.App.go('plan'); await wait();
+  const psplit = Calc.planSplitSummary(cycle);
+  eq('commitments share + savings share always sum to 1', psplit.commitmentsShare + psplit.savingsShare, 1);
+  eq('commitments share matches commitments / (commitments+savings)',
+    psplit.commitmentsShare, psplit.commitments / (psplit.commitments + psplit.savings));
+  const barCommit = w.document.querySelector('.plan-split-commit');
+  const barSave = w.document.querySelector('.plan-hero .net-bar-save');
+  check('the split bar is drawn on the Plan hero card', !!barCommit && !!barSave);
+  eq('the bar width matches the commitments share',
+    parseFloat(barCommit.style.width), psplit.commitmentsShare * 100);
+  eq('and the savings segment fills the rest',
+    parseFloat(barCommit.style.width) + parseFloat(barSave.style.width), 100);
+  check('the legend names both segments with a whole-number percent',
+    new RegExp('Commitments ' + Math.round(psplit.commitmentsShare * 100) + '%').test(txt('.net-legend')) &&
+    new RegExp('To savings ' + Math.round(psplit.savingsShare * 100) + '%').test(txt('.net-legend')));
   check('section titles carry a count',
     groups[0].querySelector('.eyebrow').textContent === 'Accounts (2)' &&
     groups[1].querySelector('.eyebrow').textContent === 'Saving Accounts (1)',

@@ -537,6 +537,16 @@ body.no-scroll { overflow: hidden; }
 .net-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
 .net-dot-spend { background: var(--green-deep); }
 .net-dot-save { background: var(--blue-deep); }
+/* Plan's version of the same bar/legend widget: what is NOT left to spend,
+   split between commitments and savings. Savings reuses the blue that means
+   "savings" everywhere else in the app (net-bar-save). Commitments needed a
+   genuinely different colour — green means "spending" and jade means "safe
+   to spend today" elsewhere, and violet was the obvious next reach for
+   "a Plan thing" (.plan-amt.tweaked uses it) EXCEPT that --violet is an
+   alias for var(--blue-deep) in this palette (see the --violet line up top),
+   so it would render identically to the savings segment right next to it.
+   Peach is the one primary accent not already claimed by spending or saving. */
+.plan-split-commit { background: var(--peach-deep); }
 
 .net-worth {
   margin: 4px 0 0;
