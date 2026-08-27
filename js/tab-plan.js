@@ -64,11 +64,33 @@
 
     var pool = Calc.cyclePool(cycleKey);
     var per = Calc.dailyAllowance(cycleKey);
-    host.appendChild(el('section', { class: 'card plan-hero' }, [
+    var split = Calc.planSplitSummary(cycleKey);
+    var heroCard = el('section', { class: 'card plan-hero' }, [
       el('span', { class: 'eyebrow', text: 'Plan for ' + C.cycleLabel(cycleKey) }),
       el('p', { class: 'plan-pool num', text: Fmt.money(pool) }),
       el('p', { class: 'card-note', text: Fmt.money(per) + ' a day' })
-    ]));
+    ]);
+    /* Same bar-and-legend widget as the Total money card on Accounts — here
+       it splits what is NOT left to spend between commitments and savings,
+       rather than spending vs saved. Only shown once there is something to
+       split; an empty Plan has nothing to draw a ratio from. */
+    if (split.commitments + split.savings > 0) {
+      heroCard.appendChild(el('div', { class: 'net-bar plan-split-bar' }, [
+        el('span', { class: 'net-bar-spend plan-split-commit', style: 'width:' + (split.commitmentsShare * 100).toFixed(1) + '%' }),
+        el('span', { class: 'net-bar-save', style: 'width:' + (split.savingsShare * 100).toFixed(1) + '%' })
+      ]));
+      heroCard.appendChild(el('div', { class: 'net-legend' }, [
+        el('span', {}, [
+          el('i', { class: 'net-dot plan-split-commit' }),
+          document.createTextNode('Commitments ' + Math.round(split.commitmentsShare * 100) + '%')
+        ]),
+        el('span', {}, [
+          el('i', { class: 'net-dot net-dot-save' }),
+          document.createTextNode('To savings ' + Math.round(split.savingsShare * 100) + '%')
+        ])
+      ]));
+    }
+    host.appendChild(heroCard);
 
     ['income', 'commitments', 'savings'].forEach(function (s) {
       host.appendChild(section(s, cycleKey));

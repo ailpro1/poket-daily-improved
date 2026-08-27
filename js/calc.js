@@ -159,6 +159,25 @@
     return R(planTotal('income', cycleKey) - planTotal('commitments', cycleKey) - planTotal('savings', cycleKey));
   }
 
+  /* How the money NOT left to spend splits between commitments and savings —
+     the Plan-tab mirror of netWorthSummary()'s bar. Shares are of the
+     absolute two-part split (same shape as netWorthSummary), not of income:
+     income can be zero, or smaller than commitments+savings if the Plan is
+     overcommitted, and either would make a share-of-income bar overflow past
+     100% or divide by zero. Sharing the pair between themselves means the
+     bar always fills exactly once, however the numbers land. */
+  function planSplitSummary(cycleKey) {
+    var commitments = planTotal('commitments', cycleKey);
+    var savings = planTotal('savings', cycleKey);
+    var span = commitments + savings;
+    return {
+      commitments: commitments,
+      savings: savings,
+      commitmentsShare: span ? commitments / span : 0,
+      savingsShare: span ? savings / span : 0
+    };
+  }
+
   /* ---------- joining part-way through a cycle ---------------------------
      Someone who installs on day 20 has neither a full cycle's pool left nor
      a full cycle's days to spend it over. When they tell us what is actually
@@ -613,6 +632,7 @@
     savingsBalance: savingsBalance,
     netWorth: netWorth,
     netWorthSummary: netWorthSummary,
+    planSplitSummary: planSplitSummary,
     planSections: planSections,
     planItems: planItems,
     planItemsSorted: planItemsSorted,

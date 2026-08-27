@@ -322,6 +322,15 @@ the in-memory state. There is also a human-readable CSV export of the Plan.
 - **The Total money card** shows the figure, how much it has moved since the
   month started, and a bar for the split. It deliberately does *not* repeat the
   two group totals — those are printed next to their own headings right below it.
+- **The Plan hero card** carries the same bar-and-legend widget
+  (`Calc.planSplitSummary`), splitting what is *not* left to spend between
+  commitments and savings. Shares are of commitments+savings combined, not of
+  income — income can be zero or smaller than the two combined (an
+  overcommitted Plan), and either would divide by zero or overflow past 100%
+  on a share-of-income bar. Commitments gets `--peach-deep`: `--violet` is an
+  alias for `--blue-deep` in this palette (see the token block up top), so it
+  would render identical to the savings segment sitting right next to it —
+  that collision shipped once and was caught by screenshot, not by a test.
 - **The daily figure on the splash** spins up digit by digit (`Splash.rollInto`).
   Each digit is a reel of 0-9 with the target appended, so the landing distance
   is `ROLL_SPINS * 10` cells — **not** plus the digit, which overshoots into
