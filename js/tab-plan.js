@@ -65,21 +65,33 @@
     var pool = Calc.cyclePool(cycleKey);
     var per = Calc.dailyAllowance(cycleKey);
     var split = Calc.planSplitSummary(cycleKey);
+    var overCommitted = pool < 0;
     var heroCard = el('section', { class: 'card plan-hero' }, [
       el('span', { class: 'eyebrow', text: 'Plan for ' + C.cycleLabel(cycleKey) }),
-      el('p', { class: 'plan-pool num', text: Fmt.money(pool) }),
-      el('p', { class: 'card-note', text: Fmt.money(per) + ' a day' })
+      el('p', { class: 'plan-pool num' + (overCommitted ? ' neg' : ''), text: Fmt.money(pool) }),
+      el('p', {
+        class: 'card-note',
+        text: overCommitted
+          ? 'Short by ' + Fmt.money(Math.abs(pool)) + ' — income does not cover commitments and savings this month.'
+          : Fmt.money(per) + ' a day'
+      })
     ]);
     /* Same bar-and-legend widget as the Total money card on Accounts — here
        it splits what is NOT left to spend between commitments and savings,
        rather than spending vs saved. Only shown once there is something to
-       split; an empty Plan has nothing to draw a ratio from. */
+       split; an empty Plan has nothing to draw a ratio from.
+
+       A third segment shows what income never reached — sized off
+       uncoveredShare, which is 0 whenever income covers commitments and
+       savings in full, so this is the same bar as before in that case, not
+       a special-cased alternate rendering. */
     if (split.commitments + split.savings > 0) {
       heroCard.appendChild(el('div', { class: 'net-bar plan-split-bar' }, [
-        el('span', { class: 'net-bar-spend plan-split-commit', style: 'width:' + (split.commitmentsShare * 100).toFixed(1) + '%' }),
-        el('span', { class: 'net-bar-save', style: 'width:' + (split.savingsShare * 100).toFixed(1) + '%' })
+        el('span', { class: 'net-bar-spend plan-split-commit', style: 'width:' + (split.fundedCommitmentsShare * 100).toFixed(1) + '%' }),
+        el('span', { class: 'net-bar-save', style: 'width:' + (split.fundedSavingsShare * 100).toFixed(1) + '%' }),
+        el('span', { class: 'plan-split-uncovered', style: 'width:' + (split.uncoveredShare * 100).toFixed(1) + '%' })
       ]));
-      heroCard.appendChild(el('div', { class: 'net-legend' }, [
+      var legend = el('div', { class: 'net-legend' }, [
         el('span', {}, [
           el('i', { class: 'net-dot plan-split-commit' }),
           document.createTextNode('Commitments ' + Math.round(split.commitmentsShare * 100) + '%')
@@ -88,7 +100,14 @@
           el('i', { class: 'net-dot net-dot-save' }),
           document.createTextNode('To savings ' + Math.round(split.savingsShare * 100) + '%')
         ])
-      ]));
+      ]);
+      if (split.uncoveredShare > 0) {
+        legend.appendChild(el('span', {}, [
+          el('i', { class: 'net-dot plan-split-uncovered' }),
+          document.createTextNode('Not covered ' + Math.round(split.uncoveredShare * 100) + '%')
+        ]));
+      }
+      heroCard.appendChild(legend);
     }
     host.appendChild(heroCard);
 

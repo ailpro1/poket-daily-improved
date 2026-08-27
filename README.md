@@ -324,13 +324,30 @@ the in-memory state. There is also a human-readable CSV export of the Plan.
   two group totals — those are printed next to their own headings right below it.
 - **The Plan hero card** carries the same bar-and-legend widget
   (`Calc.planSplitSummary`), splitting what is *not* left to spend between
-  commitments and savings. Shares are of commitments+savings combined, not of
-  income — income can be zero or smaller than the two combined (an
-  overcommitted Plan), and either would divide by zero or overflow past 100%
-  on a share-of-income bar. Commitments gets `--peach-deep`: `--violet` is an
-  alias for `--blue-deep` in this palette (see the token block up top), so it
-  would render identical to the savings segment sitting right next to it —
-  that collision shipped once and was caught by screenshot, not by a test.
+  commitments and savings. `commitmentsShare`/`savingsShare` are of
+  commitments+savings combined, not of income — income can be zero or
+  smaller than the two combined (an overcommitted Plan), and either would
+  divide by zero or overflow past 100% on a share-of-income bar. Commitments
+  gets `--peach-deep`: `--violet` is an alias for `--blue-deep` in this
+  palette (see the token block up top), so it would render identical to the
+  savings segment sitting right next to it — that collision shipped once and
+  was caught by screenshot, not by a test.
+
+  The bar also shows over-commitment, as a **third** segment (`.plan-split-
+  uncovered`, `var(--red)`) rather than a different bar: `fundedCommitmentsShare`
+  = `min(commitments, income)`, `fundedSavingsShare` = whatever income has
+  left after commitments, `uncoveredShare` = whatever income never reaches —
+  all still shares of the same commitments+savings span, always summing to 1.
+  When income covers everything, `uncoveredShare` is exactly 0 and the bar is
+  pixel-identical to the plain two-segment version — there is no separate
+  "safe" rendering path to keep in sync with this one. The same `pool < 0`
+  condition (`Calc.cyclePool`) also turns `.plan-pool` red (`.neg`, the same
+  utility class `.hero-over` uses) and swaps its caption to a shortfall
+  message. Critically, the shortfall is NOT clamped to "commitments alone
+  exceed income" — it lands whichever segment income actually runs out in, so
+  a Plan with affordable commitments but an unaffordable savings goal shows
+  the red block inside the *savings* segment, not just when commitments alone
+  are the problem.
 - **The daily figure on the splash** spins up digit by digit (`Splash.rollInto`).
   Each digit is a reel of 0-9 with the target appended, so the landing distance
   is `ROLL_SPINS * 10` cells — **not** plus the digit, which overshoots into
