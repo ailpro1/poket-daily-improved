@@ -125,6 +125,58 @@ w.addEventListener('error', e => errors.push(e.message));
   byText('.btn', 'Add to Plan').click(); await wait(120);
   check('plan item saved', w.S.plan.income.length === 1 && w.S.plan.income[0].amount === 4500);
 
+  // editing a Plan item's amount asks for confirmation and says which scope
+  w.App.go('plan'); await wait();
+  byText('.plan-name', 'Gaji').click(); await wait();
+  check('editing without touching the amount needs no confirmation', true); // sanity anchor
+  q('.sheet-body input[type=text]').value = 'Gaji Bulanan';
+  byText('.btn', 'Save').click(); await wait(150);
+  check('a rename alone saves straight away, no confirm sheet', !D.querySelector('.sheet-wrap.open'));
+  check('the rename took', w.S.plan.income[0].name === 'Gaji Bulanan');
+
+  byText('.plan-name', 'Gaji Bulanan').click(); await wait();
+  w.CentInput.set(q('.input-amount'), 5000);
+  byText('.seg', 'Just this month').click();
+  byText('.btn', 'Save').click(); await wait(200);
+  check('changing the amount opens a confirmation instead of saving straight away',
+    /Change Gaji Bulanan\?/.test(sheet().textContent), sheet().textContent.slice(0, 60));
+  check('it says the change is just this month',
+    /this month only/.test(sheet().textContent) && /back to RM4,500\.00 next month/.test(sheet().textContent),
+    sheet().textContent);
+  byText('.btn', 'Cancel').click(); await wait(200);
+  check('cancelling leaves the amount untouched', w.Calc.planAmount(w.S.plan.income[0], w.App.cycleKey()) === 4500);
+  /* Cancel only closes the confirm sheet — the edit sheet is still open
+     underneath it, same as any other confirm-gated action in this app. */
+  q('.sheet-head .icon-btn').click(); await wait(300);
+
+  byText('.plan-name', 'Gaji Bulanan').click(); await wait();
+  w.CentInput.set(q('.input-amount'), 5000);
+  byText('.seg', 'Just this month').click();
+  byText('.btn', 'Save').click(); await wait(150);
+  byText('.btn', 'Save for this month only').click(); await wait(200);
+  check('confirming a this-month change sets a cycle override, not the base amount',
+    w.S.plan.income[0].amount === 4500 &&
+    w.S.plan.income[0].cycleOverrides[w.App.cycleKey()] === 5000);
+  w.App.go('plan'); await wait();
+  check('the list shows a green dot for a this-month-only change',
+    !!D.querySelector('.plan-dot'));
+
+  byText('.plan-name', 'Gaji Bulanan').click(); await wait();
+  w.CentInput.set(q('.input-amount'), 6000);
+  byText('.seg', 'From now on').click();
+  byText('.btn', 'Save').click(); await wait(150);
+  check('an every-month change is worded differently',
+    /every month from now on/.test(sheet().textContent) && !/this month only/.test(sheet().textContent),
+    sheet().textContent);
+  byText('.btn', 'Save for every month').click(); await wait(200);
+  check('confirming an every-month change updates the base amount',
+    w.S.plan.income[0].amount === 6000);
+  check('and clears any leftover this-month override',
+    w.S.plan.income[0].cycleOverrides[w.App.cycleKey()] === undefined);
+  w.App.go('plan'); await wait();
+  check('an every-month change carries no green dot — it is not temporary',
+    !D.querySelector('.plan-dot'));
+
   // transaction form via the FAB
   $('#fab').click(); await wait();
   type(q('.input-amount'), '1250');
@@ -369,7 +421,22 @@ w.addEventListener('error', e => errors.push(e.message));
     check(tab + ' help names the page', title === w.App.HELP[tab].title + ' — how it works', title);
     check(tab + ' help has real content', sheet().querySelectorAll('.help-para').length === w.App.HELP[tab].body.length);
     esc(); await wait(300);
+    // the month nav is a Transaction-tab-only feature
+    check(tab + (tab === 'log' ? ' shows' : ' hides') + ' the month nav',
+      !!D.querySelector('#app-head .cycle-nav') === (tab === 'log'));
   }
+
+  // browsing a past month must not silently steer the OTHER tabs once you
+  // leave Log — that is the whole point of confining the nav to it
+  w.App.go('log'); await wait();
+  const curKey = w.App.cycleKey();
+  w.App.setCycle(w.Cycles.shiftCycleKey(curKey, -1));
+  await wait();
+  check('Log is now viewing a past month', w.App.cycleKey() !== curKey);
+  w.App.go('plan'); await wait();
+  check('leaving Log resets it, so Plan sees the current month', w.App.cycleKey() === curKey);
+  w.App.go('log'); await wait();
+  check('and Log itself is back on the current month too', w.App.cycleKey() === curKey);
   w.App.go('accounts'); await wait();
   check('the Accounts card no longer carries the explanation',
     !/added together. The arrow shows/.test(D.querySelector('#app-main').textContent));
@@ -513,7 +580,7 @@ w.addEventListener('error', e => errors.push(e.message));
     Array.isArray(parsed.logs) && !!parsed.plan && Array.isArray(parsed.checklist));
   w.Settings.exportPlanCsv();
   await wait(60);
-  check('plan CSV exports a header and a row', /"Section","Name"/.test(captured) && /"income","Gaji"/.test(captured));
+  check('plan CSV exports a header and a row', /"Section","Name"/.test(captured) && /"income","Gaji Bulanan"/.test(captured));
   w.Blob = RealBlob;
 
   check('no uncaught errors during the run', errors.length === 0, errors.join(' | '));

@@ -71,6 +71,8 @@
           'Income minus commitments minus savings. Share that over the days in the month and you get your daily budget. This is what Home works from, not your account totals.'],
         ['The order',
           'Biggest first, using this month\'s amount. Change one just for this month and it moves. One that has ended drops to the bottom.'],
+        ['Changing an amount',
+          'You choose whether it is just this month or every month from now on, and we ask you to confirm before saving. A green dot means it is changed for this month only — it goes back on its own next month.'],
         ['Ticking things off',
           'The checklist logs the real transaction on that item\'s account. Untick it and the transaction is removed.']
       ]
@@ -218,14 +220,20 @@
         el('button', { class: 'icon-btn', 'aria-label': 'Settings', text: '⚙', onclick: function () { root.Settings.open(); } })
       ])
     ]));
-    head.appendChild(el('div', { class: 'cycle-nav' }, [
-      el('button', { class: 'icon-btn', 'aria-label': 'Previous cycle', text: '‹', onclick: function () { setCycle(C.shiftCycleKey(key, -1)); } }),
-      el('button', {
-        class: 'cycle-label' + (isCurrent ? '' : ' past'), text: C.cycleLabel(key),
-        onclick: function () { setCycle(C.currentCycleKey()); }
-      }),
-      el('button', { class: 'icon-btn', 'aria-label': 'Next cycle', text: '›', onclick: function () { setCycle(C.shiftCycleKey(key, 1)); } })
-    ]));
+    /* Browsing past months is a Transaction-tab feature only — everywhere
+       else always shows the current month, so the nav has no reason to be
+       there. go() resets viewCycle on the way out of Log, so this can just
+       key off the current tab. */
+    if (current === 'log') {
+      head.appendChild(el('div', { class: 'cycle-nav' }, [
+        el('button', { class: 'icon-btn', 'aria-label': 'Previous month', text: '‹', onclick: function () { setCycle(C.shiftCycleKey(key, -1)); } }),
+        el('button', {
+          class: 'cycle-label' + (isCurrent ? '' : ' past'), text: C.cycleLabel(key),
+          onclick: function () { setCycle(C.currentCycleKey()); }
+        }),
+        el('button', { class: 'icon-btn', 'aria-label': 'Next month', text: '›', onclick: function () { setCycle(C.shiftCycleKey(key, 1)); } })
+      ]));
+    }
   }
 
   function renderNav() {
@@ -270,6 +278,9 @@
       window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
       return;
     }
+    /* The month nav only shows on Log, so a browsed-to past month must not
+       silently keep steering every other tab. Leaving Log resets it. */
+    if (tab !== 'log') viewCycle = null;
     current = tab;
     window.scrollTo(0, 0);
     refresh();

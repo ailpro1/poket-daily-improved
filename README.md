@@ -298,6 +298,19 @@ the in-memory state. There is also a human-readable CSV export of the Plan.
   a day; they are stored as `YYYY-MM-DD` strings.
 - **Bottom nav** defaults to Home, Transaction, Plan, Accounts, Breakdown, and
   is reorderable in Settings.
+- **The month nav is a Transaction-tab feature only.** `App.viewCycle` still
+  drives `App.cycleKey()` everywhere, but `go()` resets it to `null` the
+  instant you leave Log, so a month browsed to there can never silently steer
+  Home, Plan, Accounts or Breakdown — they always show the current month.
+  `renderHeader()` only draws the `‹ month ›` row when `current === 'log'`.
+- **Editing a Plan item's amount asks first**, and says which of the two
+  scopes it means: *"for `<month>` only, back to `<old amount>` next month"*
+  or *"for every month from now on"*. Renaming, moving the account, or
+  changing the due date saves straight away — only the amount is gated,
+  compared against what the field showed when the sheet opened. A row with a
+  live `cycleOverrides` entry for the month being viewed gets a small green
+  `.plan-dot`, since that change reverts on its own; an "always" edit gets none,
+  because it isn't temporary.
 - **Help lives behind the `?`** in the header, one entry per tab in `App.HELP`,
   so the cards themselves stay short. Anything explaining *how a number works*
   belongs there; only figures and one-line facts stay on a card.

@@ -454,6 +454,12 @@ body.no-scroll { overflow: hidden; }
 .plan-name { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
 .plan-amt { font-size: 14px; font-weight: 700; }
 .plan-amt.tweaked { color: var(--violet); }
+.plan-name-row { display: flex; align-items: center; gap: 6px; }
+.plan-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green-deep); flex: none;
+  display: inline-block;
+}
 .plan-ended { opacity: .5; }
 .plan-income .sec-head b { color: var(--jade); }
 .plan-savings .sec-head b { color: var(--violet); }
