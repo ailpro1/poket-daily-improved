@@ -537,23 +537,43 @@
           onclick: function () {
             var amt = root.CentInput.value(amount);
             if (!name.value.trim()) { UI.toast('Give it a name', { tone: 'warn' }); return; }
-            item.name = name.value.trim();
-            item.accountId = acc.value;
-            item.dueType = dueType;
-            item.dueDay = parseInt(dueDay.value, 10) || 1;
-            item.dueDate = dueDate.value || null;
-            item.endMonth = endMonth.value || null;
-            if (applyMode === 'cycle' && !isNew) item.cycleOverrides[cycleKey] = amt;
-            else {
-              item.amount = amt;
-              delete item.cycleOverrides[cycleKey];
+
+            function commit() {
+              item.name = name.value.trim();
+              item.accountId = acc.value;
+              item.dueType = dueType;
+              item.dueDay = parseInt(dueDay.value, 10) || 1;
+              item.dueDate = dueDate.value || null;
+              item.endMonth = endMonth.value || null;
+              if (applyMode === 'cycle' && !isNew) item.cycleOverrides[cycleKey] = amt;
+              else {
+                item.amount = amt;
+                delete item.cycleOverrides[cycleKey];
+              }
+              root.Actions.savePlanItem(section, item).then(function () {
+                if (hasLog) return root.Actions.syncChecklistLogAmount(cycleKey, item.id, root.Calc.planAmount(item, cycleKey));
+              }).then(function () {
+                s.close();
+                UI.toast(isNew ? 'Added to Plan' : 'Plan updated');
+              });
             }
-            root.Actions.savePlanItem(section, item).then(function () {
-              if (hasLog) return root.Actions.syncChecklistLogAmount(cycleKey, item.id, root.Calc.planAmount(item, cycleKey));
-            }).then(function () {
-              s.close();
-              UI.toast(isNew ? 'Added to Plan' : 'Plan updated');
-            });
+
+            /* Changing what a Plan item is worth changes the daily budget, so
+               ask first — and say plainly whether it is just this month or
+               every month, since that is easy to pick the wrong segment on
+               and not notice until the total looks off. Only the amount
+               triggers this; renaming or moving an account does not. */
+            var amountChanged = !isNew && Math.round(amt * 100) !== Math.round(currentAmount * 100);
+            if (!amountChanged) { commit(); return; }
+
+            var forThisMonth = applyMode === 'cycle';
+            UI.confirm({
+              title: 'Change ' + (item.name.trim() || name.value.trim() || 'this amount') + '?',
+              message: forThisMonth
+                ? 'This sets it to ' + Fmt.money(amt) + ' for ' + C.cycleLabel(cycleKey) + ' only. It goes back to ' + Fmt.money(item.amount) + ' next month.'
+                : 'This sets it to ' + Fmt.money(amt) + ' for every month from now on.',
+              confirmLabel: forThisMonth ? 'Save for this month only' : 'Save for every month'
+            }).then(function (ok) { if (ok) commit(); });
           }
         }));
         body.appendChild(actions);

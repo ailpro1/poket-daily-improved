@@ -35,7 +35,14 @@
           onkeydown: function (e) { if (e.key === 'Enter') e.target.click(); }
         }, [
           el('span', { class: 'plan-main' }, [
-            el('span', { class: 'plan-name', text: it.name }),
+            el('span', { class: 'plan-name-row' }, [
+              el('span', { class: 'plan-name', text: it.name }),
+              /* Green dot = changed for THIS month only, via cycleOverrides —
+                 it reverts on its own next month, unlike an "always" edit. */
+              overridden ? el('span', {
+                class: 'plan-dot', 'aria-label': 'Changed for this month only', title: 'Changed for this month only'
+              }) : null
+            ]),
             el('span', { class: 'log-meta', text: (acc ? acc.icon + ' ' + acc.name : 'no account') + ' · due ' + due + (ended ? ' · ended' : '') })
           ]),
           el('span', { class: 'num plan-amt' + (overridden ? ' tweaked' : ''), text: Fmt.money(amt) })
