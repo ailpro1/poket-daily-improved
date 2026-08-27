@@ -547,6 +547,10 @@ body.no-scroll { overflow: hidden; }
    so it would render identically to the savings segment right next to it.
    Peach is the one primary accent not already claimed by spending or saving. */
 .plan-split-commit { background: var(--peach-deep); }
+/* The part of commitments+savings income never reaches — reuses the app's
+   one danger token (var(--red), same as .neg, .hero-over, .btn-danger) so an
+   over-committed Plan reads as trouble everywhere consistently, not just here. */
+.plan-split-uncovered { background: var(--red); }
 
 .net-worth {
   margin: 4px 0 0;

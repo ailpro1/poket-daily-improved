@@ -120,9 +120,10 @@ const eq = (label, a, b) => check(label, Math.abs(a - b) < 0.02, 'got=' + a + ' 
   eq('the two shares add up to the whole bar', nws.spendingShare + nws.savingsShare, 1);
 
   /* Plan's version of the same widget: commitments vs savings, of the two
-     combined — not of income, since income can be zero or smaller than the
-     commitments+savings total (an overcommitted Plan), and either would
-     overflow or divide by zero on a share-of-income bar. */
+     combined — commitmentsShare/savingsShare are of income does not enter
+     into it, so the LEGEND's first two rows never move just because income
+     changed. What income does move is how much of that same span the bar
+     shows as actually funded vs not — see the over-commitment block below. */
   w.App.go('plan'); await wait();
   const psplit = Calc.planSplitSummary(cycle);
   eq('commitments share + savings share always sum to 1', psplit.commitmentsShare + psplit.savingsShare, 1);
@@ -138,6 +139,67 @@ const eq = (label, a, b) => check(label, Math.abs(a - b) < 0.02, 'got=' + a + ' 
   check('the legend names both segments with a whole-number percent',
     new RegExp('Commitments ' + Math.round(psplit.commitmentsShare * 100) + '%').test(txt('.net-legend')) &&
     new RegExp('To savings ' + Math.round(psplit.savingsShare * 100) + '%').test(txt('.net-legend')));
+
+  /* Over-committed: income (5000) can't cover commitments (1200) + a new
+     4500 commitment. Funded/uncovered shares are a DIFFERENT split of the
+     same span than commitmentsShare/savingsShare above — they clamp to what
+     income actually reaches. */
+  await Actions.savePlanItem('commitments', { id: 'c_big', name: 'Renovation', amount: 4500, accountId: 'a1', dueType: 'day', dueDay: 1, cycleOverrides: {} });
+  await wait(60);
+  const over1 = Calc.planSplitSummary(cycle);
+  eq('funded + funded + uncovered still sums to 1',
+    over1.fundedCommitmentsShare + over1.fundedSavingsShare + over1.uncoveredShare, 1);
+  eq('commitments alone (5700) already exceed income (5000): funded commitments caps at income',
+    over1.fundedCommitmentsShare, 5000 / (5700 + 800));
+  eq('so nothing is left to fund savings at all', over1.fundedSavingsShare, 0);
+  w.App.go('plan'); await wait();
+  eq('.plan-pool goes negative by exactly the shortfall', Calc.cyclePool(cycle), 5000 - 5700 - 800);
+  check('.plan-pool carries the neg class when over-committed',
+    w.document.querySelector('.plan-pool').classList.contains('neg'));
+  check('the caption swaps to a shortfall message',
+    /Short by RM1,500\.00/.test(txt('.plan-hero .card-note')), txt('.plan-hero .card-note'));
+  const uncoveredBar = w.document.querySelector('.plan-hero .plan-split-uncovered');
+  check('a third red bar segment is drawn', !!uncoveredBar);
+  check('its width matches uncoveredShare',
+    parseFloat(uncoveredBar.style.width).toFixed(1) === (over1.uncoveredShare * 100).toFixed(1),
+    parseFloat(uncoveredBar.style.width) + ' vs ' + (over1.uncoveredShare * 100));
+  check('the legend gains a third "Not covered" row',
+    new RegExp('Not covered ' + Math.round(over1.uncoveredShare * 100) + '%').test(txt('.net-legend')), txt('.net-legend'));
+
+  /* Commitments alone now fit — but savings (raised to 4500) still doesn't,
+     so the shortfall must show up INSIDE the savings segment, not just when
+     commitments overflow. This is the exact case the app was missing before:
+     over-commitment on savings, not only on commitments. */
+  await Actions.deletePlanItem('commitments', 'c_big');
+  await Actions.savePlanItem('savings', { id: 'v1', name: 'ASB monthly', amount: 4500, accountId: 's1', dueType: 'day', dueDay: 1, cycleOverrides: {} });
+  await wait(60);
+  const over2 = Calc.planSplitSummary(cycle);
+  eq('commitments (1200) fit fully inside income (5000)', over2.fundedCommitmentsShare, 1200 / (1200 + 4500));
+  eq('savings is funded only up to what income has left (5000-1200=3800)',
+    over2.fundedSavingsShare, 3800 / (1200 + 4500));
+  eq('the rest of savings (700) is what shows as not covered',
+    over2.uncoveredShare, 700 / (1200 + 4500));
+  check('funded commitments is unclamped here — the shortfall is entirely savings’',
+    Math.abs(over2.fundedCommitmentsShare - over2.commitmentsShare) < 0.001);
+
+  /* Back to the original, affordable Plan: the third segment and row must
+     both disappear, not just shrink to a sliver, and .plan-pool must go
+     positive again — proving the bar really does reduce to today's plain
+     two-segment rendering rather than always carrying a hidden third piece. */
+  await Actions.savePlanItem('savings', { id: 'v1', name: 'ASB monthly', amount: 800, accountId: 's1', dueType: 'day', dueDay: 1, cycleOverrides: {} });
+  await wait(60);
+  w.App.go('plan'); await wait();
+  const restored = Calc.planSplitSummary(cycle);
+  eq('uncoveredShare is exactly 0 again, not just small', restored.uncoveredShare, 0);
+  /* The bar segment element itself is always rendered (0-width when
+     unused, same as the other two) — the proof of "back to normal" is its
+     width, not its presence in the DOM. */
+  check('the third bar segment shrinks to exactly 0 width',
+    parseFloat(w.document.querySelector('.plan-hero .plan-split-uncovered').style.width) === 0);
+  check('the third legend row is gone', !/Not covered/.test(txt('.net-legend')));
+  check('.plan-pool loses the neg class', !w.document.querySelector('.plan-pool').classList.contains('neg'));
+  check('the caption reverts to the daily-rate form',
+    /a day$/.test(txt('.plan-hero .card-note')), txt('.plan-hero .card-note'));
   check('section titles carry a count',
     groups[0].querySelector('.eyebrow').textContent === 'Accounts (2)' &&
     groups[1].querySelector('.eyebrow').textContent === 'Saving Accounts (1)',

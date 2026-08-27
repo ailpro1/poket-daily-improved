@@ -167,14 +167,26 @@
      100% or divide by zero. Sharing the pair between themselves means the
      bar always fills exactly once, however the numbers land. */
   function planSplitSummary(cycleKey) {
+    var income = planTotal('income', cycleKey);
     var commitments = planTotal('commitments', cycleKey);
     var savings = planTotal('savings', cycleKey);
     var span = commitments + savings;
+    /* Three segments, always in this order, always summing to span:
+       funded commitments, funded savings, then whatever income never
+       reached. When income >= span the third segment is 0 and this reduces
+       exactly to the plain commitments/savings split — no separate "safe"
+       path to keep in sync with this one. */
+    var fundedCommitments = Math.min(commitments, income);
+    var fundedSavings = Math.max(0, Math.min(savings, income - commitments));
+    var uncovered = Math.max(0, span - income);
     return {
       commitments: commitments,
       savings: savings,
       commitmentsShare: span ? commitments / span : 0,
-      savingsShare: span ? savings / span : 0
+      savingsShare: span ? savings / span : 0,
+      fundedCommitmentsShare: span ? fundedCommitments / span : 0,
+      fundedSavingsShare: span ? fundedSavings / span : 0,
+      uncoveredShare: span ? uncovered / span : 0
     };
   }
 
